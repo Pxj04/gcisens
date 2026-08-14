@@ -1,5 +1,7 @@
 # gcisens
 
+[![Documentation Status](https://readthedocs.org/projects/gcisens/badge/?version=latest)](https://gcisens.readthedocs.io/en/latest/?badge=latest)
+
 Variance-based (Sobol') sensitivity analysis and **Sensitivity Discrepancy
 Report** for rule-based MCDA models — ESP-COMET and ESP-SPOTIS.
 
