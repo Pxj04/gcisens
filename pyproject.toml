@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gcisens"
-version = "0.1.0"
+version = "0.1.1"
 description = "Variance-based (Sobol') sensitivity analysis and Sensitivity Discrepancy Report for ESP-COMET and ESP-SPOTIS decision models"
 readme = "README.md"
 license = { text = "MIT" }
@@ -45,7 +45,7 @@ dev = ["pytest>=7", "pytest-cov", "ruff"]
 docs = ["sphinx>=7", "furo", "numpydoc"]
 
 [project.urls]
-Homepage = "https://github.com/szymonsniegowski/gcisens"
+Homepage = "https://github.com/Pxj04/gcisens"
 Documentation = "https://gcisens.readthedocs.io"
 
 [tool.hatch.build.targets.wheel]

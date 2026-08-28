@@ -38,7 +38,7 @@ from .sensitivity import SobolIndices, sobol_analysis
 from .study import Comparison, SobolStudy, StudyResult, compare
 from .validation import ValidationResult, validate_scores
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     # workflow
