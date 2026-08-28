@@ -1,10 +1,11 @@
 project = "gcisens"
-author = "Szymon Sniegowski"
-copyright = "2026, Szymon Sniegowski"
+author = "Szymon Sniegowski and Adrianna Świder"
+copyright = "2026, gcisens contributors"
 
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
     "numpydoc",
     "sphinx.ext.intersphinx",
 ]
@@ -20,3 +21,8 @@ intersphinx_mapping = {
 
 html_theme = "furo"
 html_title = "gcisens"
+html_theme_options = {
+    "source_repository": "https://github.com/Pxj04/gcisens/",
+    "source_branch": "main",
+    "source_directory": "docs/",
+}

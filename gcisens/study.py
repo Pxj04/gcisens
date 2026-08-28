@@ -248,7 +248,7 @@ class StudyResult:
         return pd.DataFrame(data)
 
     def s2_table(self) -> pd.DataFrame:
-        """Pairwise interaction indices sorted by |S2|."""
+        """Pairwise interaction indices sorted by absolute ``S2`` value."""
         return self.sobol.s2_pairs()
 
     def diagnosis(self) -> pd.DataFrame:

@@ -41,7 +41,7 @@ class SobolIndices:
         return self.ST - self.S1
 
     def s2_pairs(self) -> pd.DataFrame:
-        """All pairwise interactions sorted by |S2|, with a significance flag."""
+        """Pairwise interactions sorted by absolute ``S2``, with significance."""
         if self.S2 is None:
             raise ValueError("Second-order indices were not computed (second_order=False)")
         rows = []

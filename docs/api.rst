@@ -1,6 +1,8 @@
 API reference
 =============
 
+The package-level objects below form the supported public interface.
+
 Workflow
 --------
 
@@ -8,6 +10,9 @@ Workflow
    :members:
 
 .. autoclass:: gcisens.StudyResult
+   :members:
+
+.. autoclass:: gcisens.Comparison
    :members:
 
 .. autofunction:: gcisens.compare
@@ -25,6 +30,14 @@ Diagnosis
 .. autoclass:: gcisens.DiagnosisThresholds
    :members:
 
+Validation
+----------
+
+.. autoclass:: gcisens.ValidationResult
+   :members:
+
+.. autofunction:: gcisens.validate_scores
+
 Building blocks
 ---------------
 
@@ -33,4 +46,10 @@ Building blocks
 .. autoclass:: gcisens.SobolIndices
    :members:
 
-.. autofunction:: gcisens.validate_scores
+pymcdm re-exports
+-----------------
+
+``gcisens`` re-exports ``COMET``, ``SPOTIS``, ``ESPExpert`` and
+``get_local_weights`` from pymcdm. See :doc:`pymcdm-style` for their role in
+the workflow and the `pymcdm documentation <https://pymcdm.readthedocs.io/>`_
+for their complete API.

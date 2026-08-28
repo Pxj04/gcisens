@@ -1,7 +1,7 @@
 For pymcdm users
 ================
 
-gcisens re-exports the relevant pymcdm classes 1:1 — same classes, not
+``gcisens`` re-exports the relevant pymcdm classes 1:1 — same classes, not
 copies. Build models exactly as in the pymcdm documentation, without
 importing pymcdm:
 
@@ -22,3 +22,7 @@ Both styles produce identical objects and mix freely:
   remain plain pymcdm objects, fully compatible with ``pymcdm.visuals``;
 - any other scoring model can be analysed through the callable fallback:
   ``SobolStudy(lambda X: scores(X), bounds=..., weights=...)``.
+
+When a model is built directly through pymcdm, pass ``bounds`` and
+``criteria_names`` to :class:`gcisens.SobolStudy` if they cannot be recovered
+from the model. The one-line builders store this metadata automatically.
