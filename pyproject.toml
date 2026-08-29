@@ -42,7 +42,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov", "ruff"]
-docs = ["sphinx>=7", "furo", "numpydoc"]
+docs = ["sphinx>=7", "sphinx-rtd-theme", "numpydoc"]
 
 [project.urls]
 Homepage = "https://github.com/Pxj04/gcisens"
