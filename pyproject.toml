@@ -8,7 +8,10 @@ version = "0.1.1"
 description = "Variance-based (Sobol') sensitivity analysis and Sensitivity Discrepancy Report for ESP-COMET and ESP-SPOTIS decision models"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "Szymon Sniegowski" }]
+authors = [
+    { name = "Szymon Sniegowski" },
+    { name = "Adrianna Świder" },
+]
 requires-python = ">=3.11"
 keywords = [
     "mcda",
