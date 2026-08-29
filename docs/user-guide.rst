@@ -5,14 +5,10 @@ Practical guides, background information and API documentation for working
 with ``gcisens``.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    installation
-   quickstart
    models
    results
    reporting
    validation
-   pymcdm-style
-   methodology
-   api

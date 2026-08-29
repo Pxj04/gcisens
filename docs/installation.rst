@@ -1,40 +1,18 @@
 Installation
 ============
 
-Requirements
-------------
-
-``gcisens`` requires Python 3.11 or newer. Using a virtual environment keeps
-its scientific Python dependencies isolated from other projects.
-
-Install from PyPI
------------------
+Install the latest stable release from PyPI:
 
 .. code-block:: bash
 
    python -m pip install gcisens
 
-To use the plotting methods, no additional package is needed; Matplotlib is a
-standard dependency.
-
-Install from source
--------------------
-
-For development or to test the current repository checkout:
+This is the recommended option for regular use and includes the dependencies
+needed for plotting. Cloning the repository is only necessary if you want to
+modify the source code, run the test suite or build the documentation locally:
 
 .. code-block:: bash
 
    git clone https://github.com/Pxj04/gcisens.git
    cd gcisens
    python -m pip install -e ".[dev,docs]"
-
-Verify the installation
------------------------
-
-.. code-block:: python
-
-   import gcisens
-
-   print(gcisens.__version__)
-
-If this import succeeds, the library and its runtime dependencies are ready.
