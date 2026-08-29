@@ -15,10 +15,9 @@ Start here
 ----------
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 1
+   :titlesonly:
 
-   quickstart
-   user-guide
-   pymcdm-style
-   methodology
+   about
+   example
    api

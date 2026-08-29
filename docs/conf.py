@@ -8,7 +8,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "numpydoc",
     "sphinx.ext.intersphinx",
-    "sphinx_rtd_theme",
+    "myst_parser",
 ]
 
 autosummary_generate = True
@@ -20,12 +20,5 @@ intersphinx_mapping = {
     "pandas": ("https://pandas.pydata.org/docs/", None),
 }
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 html_title = "gcisens"
-html_theme_options = {
-    "collapse_navigation": False,
-    "navigation_depth": 4,
-    "sticky_navigation": True,
-    "includehidden": True,
-    "titles_only": False,
-}

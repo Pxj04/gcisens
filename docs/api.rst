@@ -50,6 +50,6 @@ pymcdm re-exports
 -----------------
 
 ``gcisens`` re-exports ``COMET``, ``SPOTIS``, ``ESPExpert`` and
-``get_local_weights`` from pymcdm. See :doc:`pymcdm-style` for their role in
-the workflow and the `pymcdm documentation <https://pymcdm.readthedocs.io/>`_
-for their complete API.
+``get_local_weights`` from pymcdm. See the
+`pymcdm documentation <https://pymcdm.readthedocs.io/>`_ for their complete
+API.
