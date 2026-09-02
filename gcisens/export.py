@@ -1,4 +1,5 @@
 """Exports: CSV files, LaTeX tables (article layout), standalone HTML report."""
+
 from __future__ import annotations
 
 import base64
@@ -64,9 +65,7 @@ def to_csv(result, directory, prefix: str = "results") -> list[Path]:
 # ----------------------------------------------------------------------- LaTeX
 def to_latex(result, path=None, caption=None, label=None) -> str:
     """Main results table in the layout of KES 2026, Tables 2-4."""
-    caption = caption or (
-        "Weights and Sobol' indices with the Sensitivity Discrepancy Report."
-    )
+    caption = caption or ("Weights and Sobol' indices with the Sensitivity Discrepancy Report.")
     label = label or "tab:sobol_indices"
     views = result.views
     s = result.sobol
@@ -86,12 +85,16 @@ def to_latex(result, path=None, caption=None, label=None) -> str:
         r"\hline",
     ]
     for i, name in enumerate(result.criteria_names):
-        row = [name, *(_fmt(v.values[i]) for v in views),
-               _fmt(s.interaction[i]), _fmt(s.S1_conf[i]), _fmt(s.ST_conf[i])]
+        row = [
+            name,
+            *(_fmt(v.values[i]) for v in views),
+            _fmt(s.interaction[i]),
+            _fmt(s.S1_conf[i]),
+            _fmt(s.ST_conf[i]),
+        ]
         lines.append(" & ".join(row) + r" \\")
     lines.append(r"\hline")
-    sums = [r"$\sum$", *(_fmt(v.values.sum()) for v in views),
-            _fmt(s.interaction.sum()), "", ""]
+    sums = [r"$\sum$", *(_fmt(v.values.sum()) for v in views), _fmt(s.interaction.sum()), "", ""]
     lines.append(" & ".join(sums) + r" \\")
     lines += [r"\hline", r"\end{tabular}", r"\end{table}"]
 
@@ -149,9 +152,7 @@ def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
         rf"\label{{{label}}}",
         rf"\begin{{tabular}}{{{cols}}}",
         r"\hline",
-        r"\textbf{Metric} & "
-        + " & ".join(rf"\textbf{{{c}}}" for c in df.columns)
-        + r" \\",
+        r"\textbf{Metric} & " + " & ".join(rf"\textbf{{{c}}}" for c in df.columns) + r" \\",
         r"\hline",
     ]
     for metric in df.index:
@@ -197,8 +198,7 @@ def _df_to_html(df, float_digits: int = 4) -> str:
 
 def _fig_to_base64(fig) -> str:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-                facecolor=fig.get_facecolor())
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     buf.seek(0)
     return base64.b64encode(buf.read()).decode("ascii")
 
@@ -224,8 +224,9 @@ def to_html(result, path, title: str = "Sensitivity Discrepancy Report") -> Path
 
     parts.append("<h2>Discrepancy diagnosis</h2>")
     diag = result.diagnosis()
-    parts.append("<table><thead><tr><th>Criterion</th><th>Category</th><th>Detail</th>"
-                 "</tr></thead><tbody>")
+    parts.append(
+        "<table><thead><tr><th>Criterion</th><th>Category</th><th>Detail</th></tr></thead><tbody>"
+    )
     for _, row in diag.iterrows():
         color = _CATEGORY_COLORS.get(row["Category"], "#8a8a8a")
         parts.append(
@@ -265,8 +266,7 @@ def to_html(result, path, title: str = "Sensitivity Discrepancy Report") -> Path
         for name, fn in sections:
             ax = fn(result)
             fig = (ax if not isinstance(ax, np.ndarray) else ax.ravel()[0]).figure
-            parts.append(f"<img alt='{name}' src='data:image/png;base64,"
-                         f"{_fig_to_base64(fig)}'>")
+            parts.append(f"<img alt='{name}' src='data:image/png;base64,{_fig_to_base64(fig)}'>")
             plt.close(fig)
     except Exception as exc:  # noqa: BLE001 - the report must not fail on plotting
         parts.append(f"<p class='dim'>Plots skipped: {html.escape(str(exc))}</p>")

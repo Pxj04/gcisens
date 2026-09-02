@@ -10,6 +10,7 @@ per configuration, plus the cross-configuration comparison (Table 5).
 
 Run from the repository root:  python examples/article_esp_comet.py
 """
+
 from pathlib import Path
 
 import numpy as np
@@ -49,8 +50,7 @@ configurations = {
 results = {}
 for name, esps in configurations.items():
     print(f"=== {name} ===")
-    model = esp_comet(esps=np.array(esps, dtype=float), bounds=bounds,
-                      criteria_names=criteria)
+    model = esp_comet(esps=np.array(esps, dtype=float), bounds=bounds, criteria_names=criteria)
     result = SobolStudy(model, n_samples=2048, second_order=True, seed=42).run(
         reference_point=reference_employee
     )
@@ -65,12 +65,11 @@ for name, esps in configurations.items():
     slug = name.lower().replace("+", "_")
     out = OUT / slug
     result.to_csv(out)
-    result.to_latex(out / "table_main.tex",
-                    caption=f"{name}: weights and Sobol' indices.",
-                    label=f"tab:{slug}")
+    result.to_latex(
+        out / "table_main.tex", caption=f"{name}: weights and Sobol' indices.", label=f"tab:{slug}"
+    )
     s2_to_latex(result, out / "table_s2.tex")
-    result.to_html(out / "report.html",
-                   title=f"Sensitivity Discrepancy Report — {name}")
+    result.to_html(out / "report.html", title=f"Sensitivity Discrepancy Report — {name}")
 
 comparison = compare(results)
 print("=== Cross-configuration comparison (cf. Table 5) ===")

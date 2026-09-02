@@ -30,9 +30,7 @@ def test_characteristic_objects_grid_shape():
     cvalues = [np.array([0, 1, 2]), np.array([0, 5])]
     grid = characteristic_objects_grid(cvalues)
     assert grid.shape == (6, 2)
-    assert {tuple(row) for row in grid} == {
-        (0, 0), (0, 5), (1, 0), (1, 5), (2, 0), (2, 5)
-    }
+    assert {tuple(row) for row in grid} == {(0, 0), (0, 5), (1, 0), (1, 5), (2, 0), (2, 5)}
 
 
 def test_sweep_local_weights_linear(linear_model):

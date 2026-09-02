@@ -1,5 +1,6 @@
 """Views (w, w_loc, S1, ST) decide once what the table, the LaTeX export and
 the ranking plot show, and they share one rank definition with the diagnosis."""
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -23,8 +24,7 @@ def additive(coefs):
 
 
 def run(score, bounds, weights, reference_point=None, n_samples=64):
-    study = SobolStudy(score, bounds=bounds, weights=np.array(weights),
-                       n_samples=n_samples, seed=0)
+    study = SobolStudy(score, bounds=bounds, weights=np.array(weights), n_samples=n_samples, seed=0)
     return study.run(reference_point=reference_point)
 
 
@@ -53,12 +53,12 @@ def test_table_latex_and_ranking_plot_walk_the_same_views(linear_model, referenc
     n = len(views)
 
     columns = list(result.table().columns)
-    assert columns[1:1 + n] == [v.key for v in views]
+    assert columns[1 : 1 + n] == [v.key for v in views]
     assert [c for c in columns if c.startswith("Rank_")] == [f"Rank_{v.key}" for v in views]
 
     header = result.to_latex().splitlines()[6]
     cells = [c.strip() for c in header.split("&")]
-    assert cells[1:1 + n] == [v.label for v in views]
+    assert cells[1 : 1 + n] == [v.label for v in views]
 
     ax = result.plot_rankings()
     assert [t.get_text() for t in ax.get_xticklabels()] == [v.label for v in views]
@@ -84,8 +84,7 @@ def test_tied_weights_share_one_rank_in_table_and_diagnosis():
 
 
 def test_displacement_in_the_diagnosis_is_the_one_in_the_table():
-    result = run(additive([0.4, 0.3, 0.2, 0.1]), BOUNDS_4, [0.15, 0.2, 0.3, 0.35],
-                 n_samples=256)
+    result = run(additive([0.4, 0.3, 0.2, 0.1]), BOUNDS_4, [0.15, 0.2, 0.3, 0.35], n_samples=256)
     table = result.table()
     detail = result.diagnosis().loc[0, "Detail"]
     rank_w, rank_s1 = table.loc[0, "Rank_w"], table.loc[0, "Rank_S1"]

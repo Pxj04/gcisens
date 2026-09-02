@@ -7,6 +7,7 @@ structure? Note SPOTIS scores are distances — lower means closer to the ESP.
 
 Run from the repository root:  python examples/esp_spotis_demo.py
 """
+
 from pathlib import Path
 
 import numpy as np
@@ -33,8 +34,7 @@ esp1 = np.array([25, 25, 2000, 7, 12, 2, 1], dtype=float)
 # Declared weights: what the organisation *believes* drives retention risk.
 declared = np.array([0.10, 0.10, 0.25, 0.10, 0.15, 0.15, 0.15])
 
-spotis_model = esp_spotis(esp=esp1, bounds=bounds, weights=declared,
-                          criteria_names=criteria)
+spotis_model = esp_spotis(esp=esp1, bounds=bounds, weights=declared, criteria_names=criteria)
 spotis_result = SobolStudy(spotis_model, n_samples=2048, seed=42).run(
     reference_point=[40, 12, 4448, 2, 12, 15, 7]
 )
@@ -53,5 +53,6 @@ comet_result = SobolStudy(comet_model, n_samples=2048, seed=42).run()
 
 print()
 print("=== COMET vs SPOTIS (same ESP) ===")
-print(compare({"ESP-COMET": comet_result, "ESP-SPOTIS": spotis_result})
-      .table().round(4).to_string())
+print(
+    compare({"ESP-COMET": comet_result, "ESP-SPOTIS": spotis_result}).table().round(4).to_string()
+)

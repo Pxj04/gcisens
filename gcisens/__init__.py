@@ -22,6 +22,9 @@ Users familiar with pymcdm can build models the pymcdm way — the relevant
 classes are re-exported 1:1 (same classes, not copies), so both styles mix
 freely and models stay compatible with the pymcdm ecosystem.
 """
+
+from importlib.metadata import version as _package_version
+
 from pymcdm.methods import COMET, SPOTIS
 from pymcdm.methods.comet_tools import ESPExpert, get_local_weights
 
@@ -38,7 +41,7 @@ from .sensitivity import SobolIndices, sobol_analysis
 from .study import Comparison, SobolStudy, StudyResult, View, compare
 from .validation import ValidationResult, validate_scores
 
-__version__ = "0.1.1"
+__version__ = _package_version("gcisens")
 
 __all__ = [
     # workflow

@@ -6,6 +6,7 @@ and normalise the absolute coefficients. Local weights follow the range-sweep
 algorithm of Więckowski et al. (2023), the same one implemented in
 ``pymcdm.methods.comet_tools.get_local_weights``.
 """
+
 from __future__ import annotations
 
 import itertools

@@ -10,6 +10,7 @@ numerically-zero global weights (~1e-16), so which of rho(w,S1) / rho(w,ST)
 equals 0.9643 vs 1.0000 depends on float dust below any meaningful precision;
 the test accepts either split.
 """
+
 from pathlib import Path
 
 import numpy as np
@@ -117,15 +118,9 @@ def test_cross_configuration_comparison_reproduces_table_5(hr_bounds):
     }
     table = compare(results).table()
 
-    np.testing.assert_allclose(
-        table.loc["R2"], [0.9421, 0.8099, 0.7628], atol=1e-4
-    )
-    np.testing.assert_allclose(
-        table.loc["sum_S1"], [0.9865, 0.9840, 0.9305], atol=2e-3
-    )
-    np.testing.assert_allclose(
-        table.loc["sum_ST"], [1.0197, 1.0128, 1.0752], atol=2e-3
-    )
+    np.testing.assert_allclose(table.loc["R2"], [0.9421, 0.8099, 0.7628], atol=1e-4)
+    np.testing.assert_allclose(table.loc["sum_S1"], [0.9865, 0.9840, 0.9305], atol=2e-3)
+    np.testing.assert_allclose(table.loc["sum_ST"], [1.0197, 1.0128, 1.0752], atol=2e-3)
     # ESP2 has two numerically-zero weights; the 0.9643/1.0000 split between
     # rho(w,S1) and rho(w,ST) is float-noise-dependent (see module docstring).
     esp2_rhos = sorted([table.loc["rho_w_S1", "ESP2"], table.loc["rho_w_ST", "ESP2"]])
@@ -136,8 +131,7 @@ def test_cross_configuration_comparison_reproduces_table_5(hr_bounds):
 def test_validation_reproduces_table_1(hr_bounds):
     df = pd.read_csv(DATA)
     res = run_config(hr_bounds, ESP1)
-    val = res.validate(df[CRITERIA], labels=(df["Attrition"] == "Yes"),
-                       top_k=[50, 100])
+    val = res.validate(df[CRITERIA], labels=(df["Attrition"] == "Yes"), top_k=[50, 100])
     # KES 2026, Table 1, ESP1 row.
     assert val.delta_mean == pytest.approx(0.1105, abs=1e-3)
     assert val.lift.loc[0, "lift"] == pytest.approx(2.61, abs=0.02)

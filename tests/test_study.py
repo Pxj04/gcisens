@@ -22,8 +22,7 @@ def test_manual_pymcdm_model_works_in_study(hr_setup):
     criteria, bounds, esp1, _ = hr_setup
     expert = ESPExpert(esps=esp1, bounds=bounds)
     model = COMET(expert.make_cvalues_psi(), expert)
-    result = SobolStudy(model, bounds=bounds, criteria_names=criteria,
-                        n_samples=64, seed=0).run()
+    result = SobolStudy(model, bounds=bounds, criteria_names=criteria, n_samples=64, seed=0).run()
     assert result.table().shape[0] == len(criteria)
 
 
@@ -54,8 +53,9 @@ def test_spotis_without_weights_raises(hr_setup):
 
 def test_callable_model_fallback(linear_model):
     score, bounds = linear_model
-    result = SobolStudy(score, bounds=bounds, criteria_names=["A", "B"],
-                        n_samples=256, seed=0).run()
+    result = SobolStudy(
+        score, bounds=bounds, criteria_names=["A", "B"], n_samples=256, seed=0
+    ).run()
     # Without declared weights the study reports regression-based ones.
     assert result.weights_source == "regression (samples)"
     np.testing.assert_allclose(result.weights, [0.7, 0.3], atol=0.01)
@@ -70,8 +70,9 @@ def test_callable_without_bounds_raises(linear_model):
 
 def test_validation_lift_and_orientation(linear_model):
     score, bounds = linear_model
-    result = SobolStudy(score, bounds=bounds, weights=np.array([0.7, 0.3]),
-                        n_samples=64, seed=0).run()
+    result = SobolStudy(
+        score, bounds=bounds, weights=np.array([0.7, 0.3]), n_samples=64, seed=0
+    ).run()
     rng = np.random.default_rng(3)
     X = rng.uniform(0, 10, size=(200, 2))
     labels = score(X) > np.median(score(X))
@@ -82,8 +83,7 @@ def test_validation_lift_and_orientation(linear_model):
 
 def test_compare_table(linear_model):
     score, bounds = linear_model
-    res = SobolStudy(score, bounds=bounds, weights=np.array([0.7, 0.3]),
-                     n_samples=64, seed=0).run()
+    res = SobolStudy(score, bounds=bounds, weights=np.array([0.7, 0.3]), n_samples=64, seed=0).run()
     cmp = compare({"a": res, "b": res})
     table = cmp.table()
     assert list(table.columns) == ["a", "b"]
@@ -92,8 +92,9 @@ def test_compare_table(linear_model):
 
 def test_exports_roundtrip(tmp_path, linear_model):
     score, bounds = linear_model
-    result = SobolStudy(score, bounds=bounds, weights=np.array([0.7, 0.3]),
-                        n_samples=64, seed=0).run(reference_point=[5, 5])
+    result = SobolStudy(
+        score, bounds=bounds, weights=np.array([0.7, 0.3]), n_samples=64, seed=0
+    ).run(reference_point=[5, 5])
     files = result.to_csv(tmp_path)
     assert all(f.exists() for f in files)
     main = pd.read_csv(tmp_path / "results_main.csv")

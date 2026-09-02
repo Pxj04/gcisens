@@ -8,6 +8,7 @@ The pipeline (Śniegowski et al., KES 2026; Sałabun et al., ISD 2025):
 4. rankings and Spearman correlations between the two views,
 5. per-criterion discrepancy diagnosis.
 """
+
 from __future__ import annotations
 
 import logging
@@ -94,6 +95,9 @@ class SobolStudy:
         Sampling scheme; "saltelli" matches the source articles.
     thresholds : DiagnosisThresholds, optional
         Decision-rule thresholds for the discrepancy diagnosis.
+    local_percent_step : float
+        Step size as a fraction of each criterion range for local-weight
+        sweeps. The default is 0.01.
 
     Examples
     --------
@@ -126,7 +130,7 @@ class SobolStudy:
         self.thresholds = thresholds or DiagnosisThresholds()
         self.local_percent_step = local_percent_step
 
-    def run(self, reference_point=None) -> "StudyResult":  # noqa: UP037
+    def run(self, reference_point=None) -> StudyResult:
         """Execute the full pipeline and return a :class:`StudyResult`.
 
         Parameters
@@ -169,9 +173,7 @@ class SobolStudy:
             weights_arr = np.asarray(declared, dtype=float)
             r2_fn = getattr(adapter, "declared_weights_r2", None)
             r2 = r2_fn() if callable(r2_fn) else None
-            weights_source = (
-                "regression (characteristic objects)" if r2 is not None else "declared"
-            )
+            weights_source = "regression (characteristic objects)" if r2 is not None else "declared"
             if r2 is None:
                 # Declared weights (e.g. SPOTIS): R^2 still reported so the
                 # linear-approximation quality is comparable across models.
@@ -181,9 +183,7 @@ class SobolStudy:
         local = None
         if reference_point is not None:
             point = np.asarray(reference_point, dtype=float).ravel()
-            local = np.asarray(
-                adapter.local_weights(point, percent_step=self.local_percent_step)
-            )
+            local = np.asarray(adapter.local_weights(point, percent_step=self.local_percent_step))
         else:
             point = None
 
@@ -221,9 +221,7 @@ class SobolStudy:
 
     def _sample_regression(self, adapter) -> RegressionWeights:
         rng = np.random.default_rng(self.seed)
-        X = rng.uniform(
-            adapter.bounds[:, 0], adapter.bounds[:, 1], size=(4096, adapter.n_criteria)
-        )
+        X = rng.uniform(adapter.bounds[:, 0], adapter.bounds[:, 1], size=(4096, adapter.n_criteria))
         return regression_weights(X, adapter.scores(X), adapter.bounds)
 
 
@@ -339,8 +337,7 @@ class StudyResult:
         (cf. ISD 2025, Figs. 1-2); a 2-D slice for models with more criteria."""
         from . import plots
 
-        return plots.plot_surface(self, criteria=criteria, at=at, esps=esps,
-                                  num=num, ax=ax)
+        return plots.plot_surface(self, criteria=criteria, at=at, esps=esps, num=num, ax=ax)
 
     # ----------------------------------------------------------------- exports
     def to_csv(self, directory, prefix: str = "results") -> list[Path]:
