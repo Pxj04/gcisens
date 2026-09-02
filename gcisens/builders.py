@@ -11,7 +11,13 @@ import numpy as np
 from pymcdm.methods import COMET, SPOTIS
 from pymcdm.methods.comet_tools import ESPExpert
 
-from .adapters import META_ATTR, ModelMeta
+from .adapters import (
+    META_ATTR,
+    ModelMeta,
+    validate_bounds,
+    validate_criteria_names,
+    validate_weights,
+)
 
 
 def esp_comet(
@@ -49,7 +55,11 @@ def esp_comet(
         A plain :class:`pymcdm.methods.COMET` instance with gcisens metadata.
     """
     esps = np.atleast_2d(np.asarray(esps, dtype=float))
-    bounds = np.asarray(bounds, dtype=float)
+    bounds = validate_bounds(bounds)
+    m = bounds.shape[0]
+    if esps.ndim != 2 or esps.shape[1] != m:
+        raise ValueError(f"esps must have shape (k, {m})")
+    validate_criteria_names(criteria_names, m)
     if expert is None:
         expert = ESPExpert(esps=esps, bounds=bounds)
     if cvalues is None:
@@ -102,12 +112,13 @@ def esp_spotis(
     SPOTIS scores are *distances*: lower means closer to the ESP. Validation
     and ranking helpers account for this automatically.
     """
-    bounds = np.asarray(bounds, dtype=float)
+    bounds = validate_bounds(bounds)
     m = bounds.shape[0]
+    validate_criteria_names(criteria_names, m)
     esp = np.asarray(esp, dtype=float).ravel()
     if esp.shape != (m,):
         raise ValueError(f"esp must have {m} values (one per criterion), got {esp.shape}")
-    weights = np.full(m, 1.0 / m) if weights is None else np.asarray(weights, dtype=float)
+    weights = np.full(m, 1.0 / m) if weights is None else validate_weights(weights, m)
     types = np.ones(m) if types is None else np.asarray(types, dtype=float)
     model = SPOTIS(bounds, esp=esp)
     setattr(

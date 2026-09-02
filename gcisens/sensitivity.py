@@ -16,7 +16,33 @@ from SALib.analyze import sobol as sobol_analyze
 from SALib.sample import saltelli as saltelli_sample
 from SALib.sample import sobol as sobol_sample
 
+from .adapters import validate_bounds
+
 SAMPLERS = ("saltelli", "sobol")
+NON_POWER_OF_TWO_WARNING = (
+    "n_samples={n_samples} is not a power of two; Sobol' convergence may be reduced"
+)
+
+
+def validate_n_samples(n_samples: int) -> int:
+    """Return the sample count after checking SALib's minimum."""
+    n_samples = int(n_samples)
+    if n_samples < 2:
+        raise ValueError(f"n_samples must be at least 2, got {n_samples}")
+    if n_samples & (n_samples - 1):
+        warnings.warn(
+            NON_POWER_OF_TWO_WARNING.format(n_samples=n_samples),
+            UserWarning,
+            stacklevel=2,
+        )
+    return n_samples
+
+
+def validate_sampler(sampler: str) -> str:
+    """Return a supported SALib sampler name."""
+    if sampler not in SAMPLERS:
+        raise ValueError(f"sampler must be one of {SAMPLERS}, got {sampler!r}")
+    return sampler
 
 
 @dataclass
@@ -95,18 +121,24 @@ def sobol_analysis(
         ``"saltelli"`` reproduces the sampling used in the source articles;
         ``"sobol"`` is SALib's current recommended (scrambled) sampler.
     """
-    if sampler not in SAMPLERS:
-        raise ValueError(f"sampler must be one of {SAMPLERS}, got {sampler!r}")
+    sampler = validate_sampler(sampler)
+    n_samples = validate_n_samples(n_samples)
+    bounds = validate_bounds(bounds)
     problem = {
         "num_vars": len(criteria_names),
         "names": list(criteria_names),
-        "bounds": np.asarray(bounds, dtype=float).tolist(),
+        "bounds": bounds.tolist(),
     }
     if sampler == "saltelli":
         with warnings.catch_warnings():
             # The articles used the classic Saltelli sampler; keep it available
             # without surfacing SALib's deprecation notice to users.
             warnings.simplefilter("ignore", DeprecationWarning)
+            warnings.filterwarnings(
+                "ignore",
+                message=r"\s*Convergence properties of the Sobol' sequence.*",
+                category=UserWarning,
+            )
             X = saltelli_sample.sample(problem, n_samples, calc_second_order=second_order)
     else:
         X = sobol_sample.sample(problem, n_samples, calc_second_order=second_order, seed=seed)

@@ -44,7 +44,8 @@ def validate_scores(
     labels : array-like of bool
         True for the positive class (e.g. ``Attrition == "Yes"``).
     top_k : iterable of int
-        Cut-offs for the lift table.
+        Cut-offs for the lift table. Values above the sample count are capped;
+        the table records the effective cut-off.
     ascending : bool
         Set True when *lower* scores mean higher priority (e.g. SPOTIS
         distances, where lower = closer to the expected profile).
@@ -55,13 +56,19 @@ def validate_scores(
         raise ValueError("scores and labels must have the same length")
 
     pos, neg = scores[labels], scores[~labels]
+    if len(pos) == 0:
+        raise ValueError("labels must contain at least one positive")
+    if len(neg) == 0:
+        raise ValueError("labels must contain at least one negative")
+    pos_std = pos.std(ddof=1) if len(pos) > 1 else np.nan
+    neg_std = neg.std(ddof=1) if len(neg) > 1 else np.nan
     groups = pd.DataFrame(
         {
             "group": ["positive", "negative"],
             "n": [len(pos), len(neg)],
             "mean_score": [pos.mean(), neg.mean()],
             "median_score": [np.median(pos), np.median(neg)],
-            "std_score": [pos.std(ddof=1), neg.std(ddof=1)],
+            "std_score": [pos_std, neg_std],
         }
     )
     delta_mean = float(pos.mean() - neg.mean())
@@ -70,7 +77,7 @@ def validate_scores(
     order = np.argsort(scores if ascending else -scores, kind="stable")
     rows = []
     for k in top_k:
-        k = int(k)
+        k = min(int(k), len(labels))
         hits = int(labels[order[:k]].sum())
         rate = hits / k
         rows.append(

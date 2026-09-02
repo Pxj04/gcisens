@@ -12,6 +12,7 @@ The pipeline (Śniegowski et al., KES 2026; Sałabun et al., ISD 2025):
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,7 +28,13 @@ from .diagnosis import (
     diagnosis_frame,
     rank_descending,
 )
-from .sensitivity import SobolIndices, sobol_analysis
+from .sensitivity import (
+    NON_POWER_OF_TWO_WARNING,
+    SobolIndices,
+    sobol_analysis,
+    validate_n_samples,
+    validate_sampler,
+)
 from .validation import ValidationResult, validate_scores
 from .weights import RegressionWeights, regression_weights
 
@@ -123,10 +130,10 @@ class SobolStudy:
         local_percent_step: float = 0.01,
     ):
         self.adapter = make_adapter(model, bounds, criteria_names, weights, types)
-        self.n_samples = int(n_samples)
+        self.sampler = validate_sampler(sampler)
+        self.n_samples = validate_n_samples(n_samples)
         self.second_order = bool(second_order)
         self.seed = seed
-        self.sampler = sampler
         self.thresholds = thresholds or DiagnosisThresholds()
         self.local_percent_step = local_percent_step
 
@@ -152,15 +159,21 @@ class SobolStudy:
         )
 
         # 1. Sobol' indices (also provides samples-based regression fallback).
-        sobol = sobol_analysis(
-            adapter.scores,
-            adapter.bounds,
-            names,
-            n_samples=self.n_samples,
-            second_order=self.second_order,
-            seed=self.seed,
-            sampler=self.sampler,
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=NON_POWER_OF_TWO_WARNING.format(n_samples=self.n_samples),
+                category=UserWarning,
+            )
+            sobol = sobol_analysis(
+                adapter.scores,
+                adapter.bounds,
+                names,
+                n_samples=self.n_samples,
+                second_order=self.second_order,
+                seed=self.seed,
+                sampler=self.sampler,
+            )
 
         # 2. Declared / global weights + linear-fit quality (R^2).
         declared = adapter.declared_weights()
@@ -302,7 +315,11 @@ class StudyResult:
         """
         if ascending is None:
             ascending = not self.adapter.higher_is_closer
+        if isinstance(X, pd.DataFrame) and all(name in X.columns for name in self.criteria_names):
+            X = X[self.criteria_names]
         X = np.asarray(pd.DataFrame(X).values, dtype=float)
+        if X.shape[1] != self.adapter.n_criteria:
+            raise ValueError(f"X must have {self.adapter.n_criteria} columns, got {X.shape[1]}")
         scores = self.adapter.scores(X)
         self.validation = validate_scores(scores, labels, top_k=top_k, ascending=ascending)
         return self.validation

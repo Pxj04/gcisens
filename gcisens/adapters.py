@@ -16,6 +16,42 @@ from pymcdm.methods.comet_tools import get_local_weights
 META_ATTR = "_gcisens_meta"
 
 
+def validate_bounds(bounds) -> np.ndarray:
+    """Return criteria bounds after validating their shape and row order."""
+    bounds = np.asarray(bounds, dtype=float)
+    if bounds.ndim != 2 or bounds.shape[1] != 2:
+        raise ValueError("bounds must have shape (m, 2) with [min, max] rows")
+    invalid = np.flatnonzero(~np.isfinite(bounds).all(axis=1) | (bounds[:, 0] >= bounds[:, 1]))
+    if len(invalid):
+        row = int(invalid[0])
+        lower, upper = bounds[row]
+        raise ValueError(
+            f"bounds row {row} must have min < max, got [{float(lower)}, {float(upper)}]"
+        )
+    return bounds
+
+
+def validate_weights(weights, n_criteria: int) -> np.ndarray:
+    """Return declared weights after validating their shape and normalization."""
+    weights = np.asarray(weights, dtype=float)
+    if weights.shape != (n_criteria,):
+        raise ValueError("weights must be a 1-D array with one value per criterion")
+    if (
+        not np.all(np.isfinite(weights))
+        or np.any(weights < 0)
+        or abs(float(weights.sum()) - 1.0) >= 1e-6
+    ):
+        raise ValueError("weights must be non-negative and sum to 1")
+    return weights
+
+
+def validate_criteria_names(criteria_names, n_criteria: int):
+    """Reject a criteria-name list whose length does not match the model."""
+    if criteria_names is not None and len(criteria_names) != n_criteria:
+        raise ValueError(f"Got {len(criteria_names)} criteria names for {n_criteria} criteria")
+    return criteria_names
+
+
 @dataclass
 class ModelMeta:
     """Metadata attached to a model by the :mod:`gcisens.builders` helpers."""
@@ -52,14 +88,11 @@ class ModelAdapter:
                 "or build the model with gcisens.esp_comet / gcisens.esp_spotis."
             )
         self.model = model
-        self.bounds = np.asarray(bounds, dtype=float)
-        if self.bounds.ndim != 2 or self.bounds.shape[1] != 2:
-            raise ValueError("bounds must have shape (m, 2) with [min, max] rows")
+        self.bounds = validate_bounds(bounds)
         m = self.bounds.shape[0]
         if criteria_names is None:
             criteria_names = [f"C{i + 1}" for i in range(m)]
-        if len(criteria_names) != m:
-            raise ValueError(f"Got {len(criteria_names)} criteria names for {m} criteria")
+        validate_criteria_names(criteria_names, m)
         self.criteria_names = [str(c) for c in criteria_names]
 
     @property
@@ -91,14 +124,28 @@ class CometAdapter(ModelAdapter):
     higher_is_closer = True
 
     def __init__(self, model, bounds=None, criteria_names=None):
+        self.model_bounds = np.array([[cv[0], cv[-1]] for cv in model.cvalues], dtype=float)
         if bounds is None:
             # The characteristic-value grid spans the whole domain, so the
             # bounds can be recovered from the model itself.
-            bounds = np.array([[cv[0], cv[-1]] for cv in model.cvalues], dtype=float)
+            bounds = self.model_bounds
         super().__init__(model, bounds, criteria_names)
 
     def scores(self, X):
-        return np.asarray(self.model(np.atleast_2d(np.asarray(X, dtype=float)))).ravel()
+        X = np.atleast_2d(np.asarray(X, dtype=float))
+        try:
+            return np.asarray(self.model(X)).ravel()
+        except ValueError as error:
+            outside = (X < self.model_bounds[:, 0]) | (X > self.model_bounds[:, 1])
+            if outside.any():
+                row, column = np.argwhere(outside)[0]
+                name = self.criteria_names[column]
+                lower, upper = self.model_bounds[column]
+                raise ValueError(
+                    f"Criterion {name!r} contains value {X[row, column]:g} "
+                    f"outside bounds [{float(lower)}, {float(upper)}]"
+                ) from error
+            raise
 
     def declared_weights(self):
         from .weights import comet_global_weights
@@ -135,9 +182,7 @@ class SpotisAdapter(ModelAdapter):
                 "SPOTIS models need declared criteria weights. Pass weights=... "
                 "to SobolStudy or build the model with gcisens.esp_spotis."
             )
-        self.weights = np.asarray(weights, dtype=float)
-        if self.weights.shape != (self.n_criteria,):
-            raise ValueError("weights must be a 1-D array with one value per criterion")
+        self.weights = validate_weights(weights, self.n_criteria)
         if types is None:
             if model.esp is None:
                 raise ValueError("SPOTIS without an ESP needs criteria types (1 profit / -1 cost).")
@@ -167,7 +212,7 @@ class CallableAdapter(ModelAdapter):
         if not callable(model):
             raise TypeError(f"Unsupported model type: {type(model).__name__}")
         super().__init__(model, bounds, criteria_names)
-        self.weights = None if weights is None else np.asarray(weights, dtype=float)
+        self.weights = None if weights is None else validate_weights(weights, self.n_criteria)
 
     def scores(self, X):
         return np.asarray(self.model(np.atleast_2d(np.asarray(X, dtype=float)))).ravel()
@@ -189,6 +234,10 @@ def make_adapter(model, bounds=None, criteria_names=None, weights=None, types=No
         types = types if types is not None else meta.types
 
     if isinstance(model, COMET):
+        if weights is not None or types is not None:
+            raise ValueError(
+                "COMET models do not take weights/types; they are estimated by regression"
+            )
         return CometAdapter(model, bounds, criteria_names)
     if isinstance(model, SPOTIS):
         return SpotisAdapter(model, bounds, criteria_names, weights, types)
