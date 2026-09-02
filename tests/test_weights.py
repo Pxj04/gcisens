@@ -3,9 +3,10 @@ import pytest
 
 from gcisens.weights import (
     characteristic_objects_grid,
-    comet_global_weights,
+    grid_regression_weights,
     regression_weights,
     sweep_local_weights,
+    warn_large_grid,
 )
 
 
@@ -35,21 +36,46 @@ def test_characteristic_objects_grid_shape():
     assert {tuple(row) for row in grid} == {(0, 0), (0, 5), (1, 0), (1, 5), (2, 0), (2, 5)}
 
 
-def test_comet_global_weights_warns_about_large_mej():
-    class LargeGridModel:
-        def __init__(self):
-            self.cvalues = [np.arange(201), np.arange(100)]
+def test_warn_large_grid_reports_object_count_and_memory():
+    grid_lines = [np.arange(201), np.arange(100)]
+    with pytest.warns(UserWarning, match=r"20,100 characteristic objects.*770\.6 MiB"):
+        assert warn_large_grid(grid_lines) == 20_100
 
-        def __call__(self, X):
-            return X[:, 0] + X[:, 1]
 
-    bounds = np.array([[0.0, 200.0], [0.0, 99.0]])
+def test_warn_large_grid_is_silent_below_the_limit(recwarn):
+    assert warn_large_grid([np.arange(3), np.arange(3)]) == 9
+    assert not recwarn.list
 
-    with pytest.warns(
-        UserWarning,
-        match=r"20,100 characteristic objects.*770\.6 MiB",
-    ):
-        comet_global_weights(LargeGridModel(), bounds)
+
+def test_esp_comet_warns_before_pymcdm_allocates_the_matrix(monkeypatch):
+    import warnings
+
+    from gcisens import builders, weights
+
+    warnings_seen_at_construction = []
+
+    class RecordingComet:
+        def __init__(self, cvalues, expert):
+            warnings_seen_at_construction.append(len(caught))
+
+    monkeypatch.setattr(weights, "LARGE_GRID_OBJECTS", 10)
+    monkeypatch.setattr(builders, "COMET", RecordingComet)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        builders.esp_comet(esps=[[5.0, 2.5, 0.5]], bounds=[[0, 10], [0, 5], [0, 1]])  # 27 objects
+    assert warnings_seen_at_construction == [1]
+
+
+def test_grid_regression_weights_on_an_additive_model():
+    grid_lines = [np.array([0.0, 5.0, 10.0]), np.array([0.0, 2.5, 5.0])]
+    bounds = np.array([[0.0, 10.0], [0.0, 5.0]])
+
+    def score(X):
+        return 0.8 * X[:, 0] / 10 + 0.2 * X[:, 1] / 5
+
+    fit = grid_regression_weights(score, grid_lines, bounds)
+    np.testing.assert_allclose(fit.weights, [0.8, 0.2])
+    assert fit.r2 == pytest.approx(1.0)
 
 
 def test_sweep_local_weights_linear(linear_model):

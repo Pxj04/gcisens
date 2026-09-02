@@ -198,9 +198,9 @@ class CometAdapter(ModelAdapter):
     @cached_property
     def weights_fit(self):
         """Regression fit used for declared weights and fit quality."""
-        from .weights import comet_global_weights
+        from .weights import grid_regression_weights
 
-        return comet_global_weights(self.model, self.bounds)
+        return grid_regression_weights(self.scores, self.grid_lines(), self.bounds)
 
     def declared_weights(self):
         fit = self.weights_fit
@@ -297,7 +297,15 @@ def make_adapter(model, bounds=None, criteria_names=None, weights=None, types=No
     types and ESPs; those are handed to the adapter here. An explicit
     argument that differs from the builder metadata raises ``ValueError``.
     """
-    meta = getattr(model, META_ATTR, None) or ModelMeta()
+    meta = getattr(model, META_ATTR, None)
+    if meta is None:
+        meta = ModelMeta()
+        if isinstance(model, COMET):
+            # Built by hand, so no builder warned before pymcdm allocated the
+            # judgment matrix; explain the memory use at least now.
+            from .weights import warn_large_grid
+
+            warn_large_grid(model.cvalues)
     bounds = _resolve("bounds", bounds, meta.bounds)
     criteria_names = _resolve("criteria_names", criteria_names, meta.criteria_names)
     weights = _resolve("weights", weights, meta.weights)

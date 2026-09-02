@@ -5,8 +5,13 @@ This file records notable changes to the project. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-02
+
 ### Added
 
+- Validate study inputs. COMET models reject `weights` and `types`; declared weights must be non-negative and sum to 1; the builders check `esps`, `criteria_names` and `bounds` (`min < max`); `validate()` selects DataFrame columns by name and checks their count; `validate_scores` raises without positives or negatives and caps `top_k` at the sample size; `n_samples` (at least 2, power-of-two warning) and `sampler` are checked when the study is built.
+- `warn_large_grid()` and `grid_regression_weights()` in `gcisens.weights`.
+- Documentation pages "Troubleshooting" (messages, causes, fixes) and "References".
 - Test the package version against installed distribution metadata.
 - Check minimum dependency versions, documentation, formatting and coverage in CI.
 - Keep `StudyResult.ranks` as a read-only compatibility view over `views`.
@@ -32,7 +37,9 @@ This file records notable changes to the project. The format follows
 - Require pymcdm 1.4 or newer and SALib 1.5.1 through 1.x.
 - Use one tie-aware rank definition across tables, diagnosis and plots.
 - Document `local_percent_step` and recommend the `sobol` sampler for new studies.
-- Cache the COMET weight fit and warn when its characteristic-object grid is large.
+- Cache the COMET weight fit. `esp_comet` warns about a large characteristic-object grid *before* pymcdm allocates the judgment matrix; `make_adapter` warns for COMET models built by hand.
+- Breaking: `comet_global_weights(model, bounds)` is replaced by `grid_regression_weights(score_fn, grid_lines, bounds)`; the COMET adapter passes its own scores and grid lines, so no module outside `adapters.py` reads pymcdm internals.
+- Shortened the README to the essentials; references and the code-metadata table moved to the documentation.
 - Include all rank correlations in comparison tables.
 - Breaking: replace the `R2` summary key and comparison row with `r2_fit` and `r2_samples`. `StudyResult.r2` stays as a compatibility alias.
 - Breaking: `ModelAdapter.declared_weights()` returns a `DeclaredWeights` record (weights, source label, optional R²); `CometAdapter.declared_weights_r2()` is removed.
@@ -59,6 +66,7 @@ This file records notable changes to the project. The format follows
 
 - Initial public release of the sensitivity analysis, diagnosis, plotting and export APIs.
 
-[Unreleased]: https://github.com/Pxj04/gcisens/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Pxj04/gcisens/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Pxj04/gcisens/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Pxj04/gcisens/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Pxj04/gcisens/releases/tag/v0.1.1

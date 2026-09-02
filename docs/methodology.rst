@@ -61,8 +61,9 @@ Assumptions and limitations
        judgment matrix of size ``count**2``. Seven criteria with two ESPs
        give up to ``4**7 = 16,384`` objects. The KES 2026 case study has
        12,288, because the two ESPs share one value, and needs about 290 MiB.
-       ``comet_global_weights`` warns above 20,000 objects. Reduce the number
-       of criteria or ESPs when the warning appears.
+       ``esp_comet`` warns above 20,000 objects before it builds the model.
+       Reduce the number of criteria or ESPs, or pass smaller ``cvalues``,
+       when the warning appears.
 
 Threshold sensitivity: a worked example
 ---------------------------------------
