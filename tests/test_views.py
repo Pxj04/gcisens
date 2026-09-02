@@ -93,3 +93,11 @@ def test_displacement_in_the_diagnosis_is_the_one_in_the_table():
     assert table.loc[0, "Category"] == MODERATE_DISCREPANCY
     assert (rank_w, rank_s1) == (4, 1)
     assert f"rank(w)={rank_w:g} vs rank(S1)={rank_s1:g}" in detail
+
+
+def test_ranks_dict_is_a_view_over_views(linear_model):
+    score, bounds = linear_model
+    result = run(score, bounds, [0.7, 0.3], reference_point=[5, 5])
+    assert list(result.ranks) == keys(result)
+    for v in result.views:
+        np.testing.assert_array_equal(result.ranks[v.key], v.ranks)
