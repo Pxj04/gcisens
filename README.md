@@ -80,12 +80,6 @@ Both scripts use the bundled IBM HR Attrition sample
 - [`examples/article_esp_comet.py`](https://github.com/Pxj04/gcisens/blob/main/examples/article_esp_comet.py) reproduces the ESP-COMET tables of the source article and writes CSV, LaTeX and HTML.
 - [`examples/esp_spotis_demo.py`](https://github.com/Pxj04/gcisens/blob/main/examples/esp_spotis_demo.py) compares ESP-SPOTIS with ESP-COMET at the same ESP.
 
-## Citing
-
-Use [`CITATION.cff`](https://github.com/Pxj04/gcisens/blob/main/CITATION.cff)
-(GitHub shows "Cite this repository"). The source articles are listed on the
-[References](https://gcisens.readthedocs.io/en/latest/references.html) page.
-
 ## License
 
 MIT. See [LICENSE](https://github.com/Pxj04/gcisens/blob/main/LICENSE).
