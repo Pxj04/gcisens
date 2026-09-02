@@ -17,9 +17,16 @@ This file records notable changes to the project. The format follows
 - `StudyResult.metrics`: summary metrics as `Metric` records that carry their display label; `Comparison.labels()` and the LaTeX comparison writer read it.
 - `Category`: the diagnosis category constants carry a display label and a colour; the HTML report reads them.
 - `StudyResult.view(key)`.
+- `sweep_thresholds()` and `StudyResult.sweep_thresholds()`: re-classify the criteria over a grid of threshold values.
+- Documentation page "Methodology": assumptions and limitations, and a worked threshold-sensitivity example.
+- `CITATION.cff`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `examples/data/README.md` (dataset origin and licence) and a SoftwareX code-metadata table in the README.
+- Source-article and local-weights references in the README.
 
 ### Changed
 
+- `SobolIndices` and `ValidationResult` compare by identity (`eq=False`), as they hold arrays.
+- Corrected the `seed` documentation: the default Saltelli sampler is deterministic, the seed drives the bootstrap intervals, the `sobol` sampler and the `r2_samples` sample.
+- The documentation "About" page includes the README instead of copying it; the docs copyright line matches the LICENSE.
 - Require NumPy 2.3 or newer for article reproduction.
 - Raise compiled dependency bounds to versions compatible with NumPy 2.3.
 - Require pymcdm 1.4 or newer and SALib 1.5.1 through 1.x.

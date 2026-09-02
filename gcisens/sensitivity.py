@@ -46,12 +46,13 @@ def validate_sampler(sampler: str) -> str:
     return sampler
 
 
-@dataclass
+@dataclass(eq=False)
 class SobolIndices:
     """Sobol' sensitivity indices of a model over its criteria space.
 
     ``S1_conf``, ``ST_conf`` and ``S2_conf`` are bootstrap confidence-interval
     half-widths at :attr:`conf_level`, calculated from :attr:`num_resamples`.
+    Instances compare by identity (``eq=False``), as they hold arrays.
     """
 
     S1: np.ndarray

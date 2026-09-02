@@ -56,8 +56,10 @@ Running the study
 :class:`gcisens.SobolStudy` evaluates the model across the specified criterion
 ranges and estimates Sobol' sensitivity indices. ``n_samples`` controls the
 base sample size: larger values generally provide more stable estimates but
-require more model evaluations. Setting ``seed`` makes the sampling
-reproducible.
+require more model evaluations. The default ``"saltelli"`` sampler is
+deterministic, so the indices are reproducible without a seed. ``seed`` fixes
+the bootstrap confidence intervals, the ``"sobol"`` sampler and the uniform
+sample behind ``r2_samples``.
 
 Reading the table
 -----------------

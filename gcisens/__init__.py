@@ -37,6 +37,7 @@ from .diagnosis import (
     MODERATE_DISCREPANCY,
     Category,
     DiagnosisThresholds,
+    sweep_thresholds,
 )
 from .export import comparison_to_latex, s2_to_latex
 from .sensitivity import SobolIndices, sobol_analysis
@@ -64,6 +65,7 @@ __all__ = [
     "INTERACTION_DOMINANCE",
     "MODERATE_DISCREPANCY",
     "CONFIRMED_TRANSPARENCY",
+    "sweep_thresholds",
     # building blocks
     "SobolIndices",
     "sobol_analysis",

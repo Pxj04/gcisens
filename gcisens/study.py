@@ -27,6 +27,7 @@ from .diagnosis import (
     classify,
     diagnosis_frame,
     rank_descending,
+    sweep_thresholds,
 )
 from .sensitivity import (
     NON_POWER_OF_TWO_WARNING,
@@ -121,7 +122,10 @@ class SobolStudy:
     second_order : bool
         Estimate pairwise interaction indices (S2).
     seed : int or None
-        Seed for bootstrap confidence intervals (and the "sobol" sampler).
+        Seed for the bootstrap confidence intervals, the ``"sobol"`` sampler
+        and the uniform sample behind ``r2_samples``. The default
+        ``"saltelli"`` sampler is deterministic, so ``S1``, ``ST`` and ``S2``
+        do not change with the seed.
     sampler : {"saltelli", "sobol"}
         Sampling scheme; "saltelli" matches the source articles.
     num_resamples : int
@@ -198,7 +202,8 @@ class SobolStudy:
             self.sampler,
         )
 
-        # 1. Sobol' indices (also provides samples-based regression fallback).
+        # 1. Sobol' indices. The Saltelli sample is deterministic; ``seed``
+        # only drives the bootstrap intervals and the "sobol" sampler.
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -458,6 +463,17 @@ class StudyResult:
     def diagnosis(self) -> pd.DataFrame:
         """Sensitivity Discrepancy Report: category + rationale per criterion."""
         return diagnosis_frame(self.diagnoses)
+
+    def sweep_thresholds(self, base: DiagnosisThresholds | None = None, **grid) -> pd.DataFrame:
+        """Re-classify the criteria over a grid of threshold values.
+
+        ``base`` defaults to :attr:`thresholds`; ``grid`` maps threshold names
+        to the values to sweep (see :func:`gcisens.sweep_thresholds`).
+        """
+        s = self.sobol
+        return sweep_thresholds(
+            self.criteria_names, self.weights, s.S1, s.ST, base or self.thresholds, **grid
+        )
 
     def summary(self) -> pd.Series:
         """Configuration-level metrics (cf. KES 2026, Table 5) followed by

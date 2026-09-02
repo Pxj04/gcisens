@@ -252,8 +252,9 @@ class CallableAdapter(ModelAdapter):
 
     Lets arbitrary scoring functions (other pymcdm methods wrapped in a lambda,
     custom models) go through the same pipeline. Declared weights are optional;
-    without them the study reports regression-based weights derived from the
-    sensitivity samples.
+    without them the study reports regression weights fitted on a seeded
+    uniform sample over the bounds (the sample behind ``r2_samples``), not on
+    the Sobol' design.
     """
 
     def __init__(self, model, bounds=None, criteria_names=None, weights=None, esps=None):

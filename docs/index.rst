@@ -20,4 +20,5 @@ Start here
 
    about
    example
+   methodology
    api

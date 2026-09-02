@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "If you use gcisens, please cite it using the metadata from this file."
+type: software
+title: "gcisens"
+abstract: >-
+  Variance-based (Sobol') sensitivity analysis and Sensitivity Discrepancy
+  Report for ESP-COMET and ESP-SPOTIS decision models.
+authors:
+  - family-names: "Śniegowski"
+    given-names: "Szymon"
+    email: "szymon-sniegowski@zut.edu.pl"
+    orcid: "https://orcid.org/0009-0005-7381-7323"
+  - family-names: "Świder"
+    given-names: "Adrianna"
+    email: "adrianna-swider@zut.edu.pl"
+    orcid: "https://orcid.org/0009-0009-3544-457X"
+version: "0.1.3"
+license: MIT
+repository-code: "https://github.com/Pxj04/gcisens"
+url: "https://gcisens.readthedocs.io"
+keywords:
+  - mcda
+  - sensitivity-analysis
+  - sobol
+  - comet
+  - spotis
+  - explainability
+preferred-citation:
+  type: article
+  status: in-preparation
+  title: >-
+    gcisens: variance-based sensitivity analysis and Sensitivity Discrepancy
+    Report for rule-based decision models
+  journal: SoftwareX
+  year: 2026
+  authors:
+    - family-names: "Śniegowski"
+      given-names: "Szymon"
+      orcid: "https://orcid.org/0009-0005-7381-7323"
+    - family-names: "Świder"
+      given-names: "Adrianna"
+      orcid: "https://orcid.org/0009-0009-3544-457X"

@@ -43,6 +43,8 @@ The category constants ``HIDDEN_INFLUENCE``, ``INTERACTION_DOMINANCE``,
 ``MODERATE_DISCREPANCY`` and ``CONFIRMED_TRANSPARENCY`` (tuple
 ``CATEGORIES``) are :class:`gcisens.Category` instances.
 
+.. autofunction:: gcisens.sweep_thresholds
+
 Validation
 ----------
 
