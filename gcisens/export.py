@@ -5,6 +5,9 @@ from __future__ import annotations
 import base64
 import html
 import io
+import json
+import warnings
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +34,29 @@ def _write(path, text: str) -> Path:
     return path
 
 
+_LATEX_ESCAPES = {
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
+
+
+def _latex_escape(value) -> str:
+    """Escape user-provided text for a LaTeX text context."""
+    return "".join(_LATEX_ESCAPES.get(character, character) for character in str(value))
+
+
+def _latex_caption(value, default: str) -> str:
+    return _latex_escape(value) if value else default
+
+
 # ------------------------------------------------------------------------- CSV
 def to_csv(result, directory, prefix: str = "results") -> list[Path]:
     """Write the study outputs as CSV files; returns the written paths."""
@@ -47,8 +73,23 @@ def to_csv(result, directory, prefix: str = "results") -> list[Path]:
         result.s2_table().to_csv(s2, index=False)
         written.append(s2)
 
+        names = result.criteria_names
+        matrix = np.asarray(result.sobol.S2, dtype=float).copy()
+        lower = np.tril_indices_from(matrix, k=-1)
+        matrix[lower] = matrix.T[lower]
+        s2_matrix = directory / f"{prefix}_s2_matrix.csv"
+        import pandas as pd
+
+        pd.DataFrame(matrix, index=names, columns=names).to_csv(s2_matrix)
+        written.append(s2_matrix)
+
     summary = directory / f"{prefix}_summary.csv"
-    result.summary().to_csv(summary, header=["value"])
+    summary_values = result.summary()
+    summary_values["thresholds"] = json.dumps(asdict(result.thresholds), sort_keys=True)
+    summary_values["reference_point"] = json.dumps(
+        None if result.reference_point is None else result.reference_point.tolist()
+    )
+    summary_values.to_csv(summary, header=["value"])
     written.append(summary)
 
     if result.validation is not None:
@@ -65,7 +106,9 @@ def to_csv(result, directory, prefix: str = "results") -> list[Path]:
 # ----------------------------------------------------------------------- LaTeX
 def to_latex(result, path=None, caption=None, label=None) -> str:
     """Main results table in the layout of KES 2026, Tables 2-4."""
-    caption = caption or ("Weights and Sobol' indices with the Sensitivity Discrepancy Report.")
+    caption = _latex_caption(
+        caption, "Weights and Sobol' indices with the Sensitivity Discrepancy Report."
+    )
     label = label or "tab:sobol_indices"
     views = result.views
     s = result.sobol
@@ -86,7 +129,7 @@ def to_latex(result, path=None, caption=None, label=None) -> str:
     ]
     for i, name in enumerate(result.criteria_names):
         row = [
-            name,
+            _latex_escape(name),
             *(_fmt(v.values[i]) for v in views),
             _fmt(s.interaction[i]),
             _fmt(s.S1_conf[i]),
@@ -106,7 +149,7 @@ def to_latex(result, path=None, caption=None, label=None) -> str:
 
 def s2_to_latex(result, path=None, top: int = 10, caption=None, label=None) -> str:
     """Top pairwise interactions in the layout of the article's S2 table."""
-    caption = caption or f"Top {top} second-order Sobol' interaction indices ($S2$)."
+    caption = _latex_caption(caption, f"Top {top} second-order Sobol' interaction indices ($S2$).")
     label = label or "tab:sobol_s2"
     pairs = result.s2_table().head(top)
     lines = [
@@ -121,7 +164,7 @@ def s2_to_latex(result, path=None, top: int = 10, caption=None, label=None) -> s
     ]
     for _, row in pairs.iterrows():
         lines.append(
-            f"{row['criterion_i']} & {row['criterion_j']} & "
+            f"{_latex_escape(row['criterion_i'])} & {_latex_escape(row['criterion_j'])} & "
             f"{_fmt(row['S2'])} & {_fmt(row['S2_conf'])} \\\\"
         )
     lines += [r"\hline", r"\end{tabular}", r"\end{table}"]
@@ -133,7 +176,7 @@ def s2_to_latex(result, path=None, top: int = 10, caption=None, label=None) -> s
 
 def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
     """Cross-configuration summary in the layout of KES 2026, Table 5."""
-    caption = caption or "Comparative summary across configurations."
+    caption = _latex_caption(caption, "Comparative summary across configurations.")
     label = label or "tab:comparison"
     df = comparison.table()
     pretty = {
@@ -152,11 +195,15 @@ def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
         rf"\label{{{label}}}",
         rf"\begin{{tabular}}{{{cols}}}",
         r"\hline",
-        r"\textbf{Metric} & " + " & ".join(rf"\textbf{{{c}}}" for c in df.columns) + r" \\",
+        r"\textbf{Metric} & "
+        + " & ".join(rf"\textbf{{{_latex_escape(c)}}}" for c in df.columns)
+        + r" \\",
         r"\hline",
     ]
     for metric in df.index:
-        row = [pretty.get(metric, metric)] + [_fmt(v) for v in df.loc[metric]]
+        row = [pretty[metric] if metric in pretty else _latex_escape(metric)] + [
+            _fmt(v) for v in df.loc[metric]
+        ]
         lines.append(" & ".join(row) + r" \\")
     lines += [r"\hline", r"\end{tabular}", r"\end{table}"]
     text = "\n".join(lines)
@@ -203,7 +250,12 @@ def _fig_to_base64(fig) -> str:
     return base64.b64encode(buf.read()).decode("ascii")
 
 
-def to_html(result, path, title: str = "Sensitivity Discrepancy Report") -> Path:
+def to_html(
+    result,
+    path,
+    title: str = "Sensitivity Discrepancy Report",
+    include_plots: bool = True,
+) -> Path:
     """Standalone dark-theme HTML report: summary, tables, diagnosis, plots."""
     parts = [
         "<!DOCTYPE html><html><head><meta charset='utf-8'>",
@@ -246,30 +298,31 @@ def to_html(result, path, title: str = "Sensitivity Discrepancy Report") -> Path
         parts.append(_df_to_html(result.validation.groups))
         parts.append(_df_to_html(result.validation.lift))
 
-    # Plots (best effort — the report stays useful without matplotlib).
-    try:
-        import matplotlib
+    if include_plots:
+        # A plot failure does not stop report generation.
+        try:
+            import matplotlib.pyplot as plt
 
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+            from . import plots
 
-        from . import plots
-
-        sections = [("Indices", plots.plot_indices)]
-        if result.sobol.S2 is not None:
-            sections.append(("Interactions", plots.plot_s2_heatmap))
-        sections.append(("Rankings", plots.plot_rankings))
-        sections.append(("Decision surface", plots.plot_surface))
-        if result.validation is not None:
-            sections.append(("Score distributions", plots.plot_validation))
-        parts.append("<h2>Plots</h2>")
-        for name, fn in sections:
-            ax = fn(result)
-            fig = (ax if not isinstance(ax, np.ndarray) else ax.ravel()[0]).figure
-            parts.append(f"<img alt='{name}' src='data:image/png;base64,{_fig_to_base64(fig)}'>")
-            plt.close(fig)
-    except Exception as exc:  # noqa: BLE001 - the report must not fail on plotting
-        parts.append(f"<p class='dim'>Plots skipped: {html.escape(str(exc))}</p>")
+            sections = [("Indices", plots.plot_indices)]
+            if result.sobol.S2 is not None:
+                sections.append(("Interactions", plots.plot_s2_heatmap))
+            sections.append(("Rankings", plots.plot_rankings))
+            sections.append(("Decision surface", plots.plot_surface))
+            if result.validation is not None:
+                sections.append(("Score distributions", plots.plot_validation))
+            parts.append("<h2>Plots</h2>")
+            for name, fn in sections:
+                ax = fn(result)
+                fig = (ax if not isinstance(ax, np.ndarray) else ax.ravel()[0]).figure
+                parts.append(
+                    f"<img alt='{name}' src='data:image/png;base64,{_fig_to_base64(fig)}'>"
+                )
+                plt.close(fig)
+        except Exception as exc:  # noqa: BLE001 - the report must not fail on plotting
+            warnings.warn(f"Plots skipped: {exc!r}", UserWarning, stacklevel=2)
+            parts.append(f"<p class='dim'>Plots skipped: {html.escape(str(exc))}</p>")
 
     parts.append("<p class='dim'>Generated by gcisens.</p></body></html>")
     return _write(path, "\n".join(parts))

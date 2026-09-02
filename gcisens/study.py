@@ -369,11 +369,22 @@ class StudyResult:
 
         return export.to_latex(self, path=path, caption=caption, label=label)
 
-    def to_html(self, path, title: str = "Sensitivity Discrepancy Report") -> Path:
+    def s2_to_latex(self, path=None, top: int = 10, caption=None, label=None) -> str:
+        """Pairwise interaction indices as a LaTeX table."""
+        from . import export
+
+        return export.s2_to_latex(self, path=path, top=top, caption=caption, label=label)
+
+    def to_html(
+        self,
+        path,
+        title: str = "Sensitivity Discrepancy Report",
+        include_plots: bool = True,
+    ) -> Path:
         """Standalone dark-theme HTML report with tables, diagnosis and plots."""
         from . import export
 
-        return export.to_html(self, path, title=title)
+        return export.to_html(self, path, title=title, include_plots=include_plots)
 
 
 class Comparison:

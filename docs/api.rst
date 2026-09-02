@@ -41,6 +41,32 @@ Validation
 
 .. autofunction:: gcisens.validate_scores
 
+Exports
+-------
+
+.. autofunction:: gcisens.export.to_csv
+
+.. autofunction:: gcisens.export.to_latex
+
+.. autofunction:: gcisens.s2_to_latex
+
+.. autofunction:: gcisens.comparison_to_latex
+
+.. autofunction:: gcisens.export.to_html
+
+Plots
+-----
+
+.. autofunction:: gcisens.plots.plot_indices
+
+.. autofunction:: gcisens.plots.plot_s2_heatmap
+
+.. autofunction:: gcisens.plots.plot_rankings
+
+.. autofunction:: gcisens.plots.plot_validation
+
+.. autofunction:: gcisens.plots.plot_surface
+
 Building blocks
 ---------------
 

@@ -16,8 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from gcisens import SobolStudy, compare, esp_comet
-from gcisens.export import comparison_to_latex, s2_to_latex
+from gcisens import SobolStudy, compare, comparison_to_latex, esp_comet, s2_to_latex
 
 HERE = Path(__file__).parent
 OUT = HERE / "output"

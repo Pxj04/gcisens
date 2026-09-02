@@ -37,6 +37,7 @@ from .diagnosis import (
     MODERATE_DISCREPANCY,
     DiagnosisThresholds,
 )
+from .export import comparison_to_latex, s2_to_latex
 from .sensitivity import SobolIndices, sobol_analysis
 from .study import Comparison, SobolStudy, StudyResult, View, compare
 from .validation import ValidationResult, validate_scores
@@ -65,6 +66,9 @@ __all__ = [
     "sobol_analysis",
     "ValidationResult",
     "validate_scores",
+    # exports
+    "s2_to_latex",
+    "comparison_to_latex",
     # pymcdm re-exports
     "COMET",
     "SPOTIS",

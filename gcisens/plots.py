@@ -111,7 +111,7 @@ def plot_s2_heatmap(result, ax=None, cmap="Greens"):
 
     Drawn directly with :func:`pymcdm.visuals.correlation_heatmap` on the
     symmetric S2 matrix; the diagonal (undefined) is blanked and significant
-    interactions (|S2| > 2 * conf and |S2| > 0.01) are starred.
+    interactions (``|S2| > 2 * conf`` and ``|S2| > 0.01``) are starred.
     """
     s = result.sobol
     if s.S2 is None:
