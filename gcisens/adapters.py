@@ -12,7 +12,6 @@ from functools import cached_property
 
 import numpy as np
 from pymcdm.methods import COMET, SPOTIS
-from pymcdm.methods.comet_tools import get_local_weights
 
 META_ATTR = "_gcisens_meta"
 
@@ -53,6 +52,31 @@ def validate_criteria_names(criteria_names, n_criteria: int):
     return criteria_names
 
 
+def validate_esps(esps, n_criteria: int) -> np.ndarray | None:
+    """Return the ESPs as a ``(k, m)`` array, or ``None`` when there are none."""
+    if esps is None:
+        return None
+    esps = np.atleast_2d(np.asarray(esps, dtype=float))
+    if esps.ndim != 2 or esps.shape[1] != n_criteria:
+        raise ValueError(f"esps must have shape (k, {n_criteria})")
+    return esps
+
+
+@dataclass(frozen=True)
+class DeclaredWeights:
+    """The weights a model reports to stakeholders, with their provenance.
+
+    ``source`` is the label the study prints (``"declared"`` for weights
+    given as an input, ``"regression (characteristic objects)"`` for the
+    COMET fit). ``r2`` is the fit quality behind the weights, ``None`` when
+    there is no fit.
+    """
+
+    weights: np.ndarray
+    source: str
+    r2: float | None = None
+
+
 @dataclass
 class ModelMeta:
     """Metadata attached to a model by the :mod:`gcisens.builders` helpers."""
@@ -75,6 +99,9 @@ class ModelAdapter:
         Criteria domain bounds, ``[min, max]`` per criterion.
     criteria_names : list of str or None
         Criteria names; defaults to ``C1..Cm``.
+    esps : ndarray of shape (k, m) or None
+        Expected Solution Points the model was built around, used as plot
+        markers. Subclasses recover them from the model when they can.
     """
 
     #: Whether higher scores mean "closer to the expected solution point".
@@ -82,7 +109,7 @@ class ModelAdapter:
     #: so they shrink towards it.
     higher_is_closer: bool = True
 
-    def __init__(self, model, bounds, criteria_names=None):
+    def __init__(self, model, bounds, criteria_names=None, esps=None):
         if bounds is None:
             raise ValueError(
                 "Criteria bounds are required. Pass bounds=... to SobolStudy "
@@ -95,17 +122,27 @@ class ModelAdapter:
             criteria_names = [f"C{i + 1}" for i in range(m)]
         validate_criteria_names(criteria_names, m)
         self.criteria_names = [str(c) for c in criteria_names]
+        #: ESPs as a ``(k, m)`` array, or ``None`` when the model has none.
+        self.esps = validate_esps(esps, m)
 
     @property
     def n_criteria(self) -> int:
         return self.bounds.shape[0]
 
+    def grid_lines(self) -> list[np.ndarray] | None:
+        """Per-criterion evaluation grid drawn on decision surfaces.
+
+        COMET returns its characteristic values; models without a grid
+        return ``None``.
+        """
+        return None
+
     def scores(self, X: np.ndarray) -> np.ndarray:
         """Evaluate the model on a 2-D matrix of alternatives; returns 1-D scores."""
         raise NotImplementedError
 
-    def declared_weights(self) -> np.ndarray | None:
-        """The weights the model "reports" to stakeholders.
+    def declared_weights(self) -> DeclaredWeights | None:
+        """The weights the model "reports" to stakeholders, with their source.
 
         Returns ``None`` when the model has no declared weights; the study then
         derives them by linear regression on the sensitivity samples.
@@ -113,7 +150,11 @@ class ModelAdapter:
         return None
 
     def local_weights(self, point, percent_step: float = 0.01) -> np.ndarray:
-        """Local criteria weights at ``point`` via the range-sweep algorithm."""
+        """Local criteria weights at ``point`` via the range-sweep algorithm.
+
+        One implementation for every model; on a COMET model it gives the
+        values of ``pymcdm.methods.comet_tools.get_local_weights``.
+        """
         from .weights import sweep_local_weights
 
         return sweep_local_weights(self.scores, point, self.bounds, percent_step)
@@ -124,13 +165,19 @@ class CometAdapter(ModelAdapter):
 
     higher_is_closer = True
 
-    def __init__(self, model, bounds=None, criteria_names=None):
+    def __init__(self, model, bounds=None, criteria_names=None, esps=None):
         self.model_bounds = np.array([[cv[0], cv[-1]] for cv in model.cvalues], dtype=float)
         if bounds is None:
             # The characteristic-value grid spans the whole domain, so the
             # bounds can be recovered from the model itself.
             bounds = self.model_bounds
-        super().__init__(model, bounds, criteria_names)
+        if esps is None:
+            # An ESPExpert keeps the points it was built from.
+            esps = getattr(getattr(model, "expert_function", None), "esps", None)
+        super().__init__(model, bounds, criteria_names, esps)
+
+    def grid_lines(self):
+        return [np.asarray(cv, dtype=float) for cv in self.model.cvalues]
 
     def scores(self, X):
         X = np.atleast_2d(np.asarray(X, dtype=float))
@@ -156,15 +203,8 @@ class CometAdapter(ModelAdapter):
         return comet_global_weights(self.model, self.bounds)
 
     def declared_weights(self):
-        return self.weights_fit.weights
-
-    def declared_weights_r2(self) -> float | None:
-        return self.weights_fit.r2
-
-    def local_weights(self, point, percent_step=0.01):
-        return np.asarray(
-            get_local_weights(self.model, np.asarray(point, dtype=float), percent_step)
-        )
+        fit = self.weights_fit
+        return DeclaredWeights(fit.weights, "regression (characteristic objects)", fit.r2)
 
 
 class SpotisAdapter(ModelAdapter):
@@ -177,10 +217,14 @@ class SpotisAdapter(ModelAdapter):
 
     higher_is_closer = False
 
-    def __init__(self, model, bounds=None, criteria_names=None, weights=None, types=None):
+    def __init__(
+        self, model, bounds=None, criteria_names=None, weights=None, types=None, esps=None
+    ):
         if bounds is None:
             bounds = model.bounds
-        super().__init__(model, bounds, criteria_names)
+        if esps is None and model.esp is not None:
+            esps = model.esp
+        super().__init__(model, bounds, criteria_names, esps)
         if weights is None:
             raise ValueError(
                 "SPOTIS models need declared criteria weights. Pass weights=... "
@@ -200,7 +244,7 @@ class SpotisAdapter(ModelAdapter):
         return np.asarray(self.model(X, self.weights, self.types, validation=False)).ravel()
 
     def declared_weights(self):
-        return self.weights
+        return DeclaredWeights(self.weights, "declared")
 
 
 class CallableAdapter(ModelAdapter):
@@ -212,37 +256,58 @@ class CallableAdapter(ModelAdapter):
     sensitivity samples.
     """
 
-    def __init__(self, model, bounds=None, criteria_names=None, weights=None):
+    def __init__(self, model, bounds=None, criteria_names=None, weights=None, esps=None):
         if not callable(model):
             raise TypeError(f"Unsupported model type: {type(model).__name__}")
-        super().__init__(model, bounds, criteria_names)
+        super().__init__(model, bounds, criteria_names, esps)
         self.weights = None if weights is None else validate_weights(weights, self.n_criteria)
 
     def scores(self, X):
         return np.asarray(self.model(np.atleast_2d(np.asarray(X, dtype=float)))).ravel()
 
     def declared_weights(self):
-        return self.weights
+        return None if self.weights is None else DeclaredWeights(self.weights, "declared")
 
 
-def make_adapter(model, bounds=None, criteria_names=None, weights=None, types=None):
+def _resolve(name, explicit, from_meta):
+    """Return the explicit argument or the builder metadata; reject conflicts."""
+    if explicit is None:
+        return from_meta
+    if from_meta is not None and not _same(explicit, from_meta):
+        raise ValueError(
+            f"{name} passed to SobolStudy differs from the {name} the model was built "
+            f"with; pass it to gcisens.esp_comet / gcisens.esp_spotis instead"
+        )
+    return explicit
+
+
+def _same(a, b) -> bool:
+    try:
+        return np.array_equal(np.asarray(a, dtype=float), np.asarray(b, dtype=float))
+    except (TypeError, ValueError):
+        return list(a) == list(b)
+
+
+def make_adapter(model, bounds=None, criteria_names=None, weights=None, types=None, esps=None):
     """Build the right adapter for ``model``.
 
-    Explicit arguments win over metadata attached by the builders.
+    Models from :mod:`gcisens.builders` carry their bounds, names, weights,
+    types and ESPs; those are handed to the adapter here. An explicit
+    argument that differs from the builder metadata raises ``ValueError``.
     """
-    meta = getattr(model, META_ATTR, None)
-    if meta is not None:
-        bounds = bounds if bounds is not None else meta.bounds
-        criteria_names = criteria_names if criteria_names is not None else meta.criteria_names
-        weights = weights if weights is not None else meta.weights
-        types = types if types is not None else meta.types
+    meta = getattr(model, META_ATTR, None) or ModelMeta()
+    bounds = _resolve("bounds", bounds, meta.bounds)
+    criteria_names = _resolve("criteria_names", criteria_names, meta.criteria_names)
+    weights = _resolve("weights", weights, meta.weights)
+    types = _resolve("types", types, meta.types)
+    esps = _resolve("esps", esps, meta.esps)
 
     if isinstance(model, COMET):
         if weights is not None or types is not None:
             raise ValueError(
                 "COMET models do not take weights/types; they are estimated by regression"
             )
-        return CometAdapter(model, bounds, criteria_names)
+        return CometAdapter(model, bounds, criteria_names, esps)
     if isinstance(model, SPOTIS):
-        return SpotisAdapter(model, bounds, criteria_names, weights, types)
-    return CallableAdapter(model, bounds, criteria_names, weights)
+        return SpotisAdapter(model, bounds, criteria_names, weights, types, esps)
+    return CallableAdapter(model, bounds, criteria_names, weights, esps)

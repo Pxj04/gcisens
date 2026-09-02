@@ -42,12 +42,12 @@ def test_comet_adapter_weights_fit_has_no_call_order_dependency(hr_setup):
     model = esp_comet(esps=esp1, bounds=bounds, criteria_names=criteria)
     adapter = CometAdapter(model)
 
-    r2 = adapter.declared_weights_r2()
+    declared = adapter.declared_weights()
     fit = adapter.weights_fit
 
-    assert r2 == fit.r2
+    assert declared.r2 == fit.r2
     assert adapter.weights_fit is fit
-    np.testing.assert_allclose(adapter.declared_weights(), fit.weights)
+    np.testing.assert_allclose(declared.weights, fit.weights)
 
 
 def test_spotis_study_uses_declared_weights(hr_setup):

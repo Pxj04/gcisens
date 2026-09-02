@@ -16,6 +16,7 @@ from .adapters import (
     ModelMeta,
     validate_bounds,
     validate_criteria_names,
+    validate_esps,
     validate_weights,
 )
 
@@ -61,11 +62,9 @@ def esp_comet(
     roughly ``2 * count**2`` bytes. Weight analysis warns when the count is
     above 20,000.
     """
-    esps = np.atleast_2d(np.asarray(esps, dtype=float))
     bounds = validate_bounds(bounds)
     m = bounds.shape[0]
-    if esps.ndim != 2 or esps.shape[1] != m:
-        raise ValueError(f"esps must have shape (k, {m})")
+    esps = validate_esps(esps, m)
     validate_criteria_names(criteria_names, m)
     if expert is None:
         expert = ESPExpert(esps=esps, bounds=bounds)
