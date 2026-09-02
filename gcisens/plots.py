@@ -192,8 +192,9 @@ def plot_surface(
 ):
     """Decision surface over two criteria with the evaluation grid and ESPs.
 
-    Reproduces the surface plots of Sałabun et al. (ISD 2025), Figs. 1-2
-    (``pymcdm.visuals.comet_2d_esp_plot``) for any scoring model. For models
+    Same layout as the surface plots of Sałabun et al. (ISD 2025), Figs. 1-2
+    (``pymcdm.visuals.comet_2d_esp_plot``), drawn here for any scoring model
+    instead of only COMET. For models
     with more than two criteria the surface is a 2-D *slice*: the remaining
     criteria are fixed at ``at`` (default: the study's reference point, or
     the middle of the bounds). The adapter's grid lines (characteristic

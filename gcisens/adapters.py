@@ -145,7 +145,7 @@ class ModelAdapter:
         """The weights the model "reports" to stakeholders, with their source.
 
         Returns ``None`` when the model has no declared weights; the study then
-        derives them by linear regression on the sensitivity samples.
+        fits them by linear regression on a uniform sample over the bounds.
         """
         return None
 
@@ -222,7 +222,7 @@ class SpotisAdapter(ModelAdapter):
     ):
         if bounds is None:
             bounds = model.bounds
-        if esps is None and model.esp is not None:
+        if esps is None:
             esps = model.esp
         super().__init__(model, bounds, criteria_names, esps)
         if weights is None:
@@ -283,9 +283,10 @@ def _resolve(name, explicit, from_meta):
 
 def _same(a, b) -> bool:
     try:
-        return np.array_equal(np.asarray(a, dtype=float), np.asarray(b, dtype=float))
+        a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
     except (TypeError, ValueError):
         return list(a) == list(b)
+    return a.shape == b.shape and np.allclose(a, b)
 
 
 def make_adapter(model, bounds=None, criteria_names=None, weights=None, types=None, esps=None):

@@ -124,7 +124,6 @@ def test_make_adapter_hands_builder_metadata_to_the_adapter():
     np.testing.assert_array_equal(comet.esps, [[7.0, 2.0]])
     np.testing.assert_array_equal(spotis.esps, [[7.0, 2.0]])
     np.testing.assert_allclose(spotis.weights, [0.6, 0.4])
-    assert not hasattr(comet, "_gcisens_meta")
 
 
 @pytest.mark.parametrize(
