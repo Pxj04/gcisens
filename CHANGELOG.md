@@ -14,6 +14,9 @@ This file records notable changes to the project. The format follows
 - Expose Sobol' bootstrap and S2 significance settings.
 - Report `r2_samples`, a linear-fit R² on one uniform sample of `n_r2_samples` points (default 4096). It is computed the same way for every model, next to the source-specific `r2_fit`.
 - Accept `esps` in `SobolStudy` so surface plots of callable models can mark Expected Solution Points.
+- `StudyResult.metrics`: summary metrics as `Metric` records that carry their display label; `Comparison.labels()` and the LaTeX comparison writer read it.
+- `Category`: the diagnosis category constants carry a display label and a colour; the HTML report reads them.
+- `StudyResult.view(key)`.
 
 ### Changed
 
@@ -30,6 +33,11 @@ This file records notable changes to the project. The format follows
 - Use one range-sweep implementation for local weights of every model (identical values to pymcdm's `get_local_weights` on COMET).
 - Raise `ValueError` when an explicit `SobolStudy` argument differs from the metadata of a model built with `esp_comet` or `esp_spotis`.
 - Set the package version to 0.1.3.
+- `StudyResult` is a plain record: `views`, `sobol`, `diagnoses`, `r2_fit`, `r2_samples`, `thresholds`, `weights_source`, `reference_point`, `n_r2_samples`, `validation` and an optional `adapter`. `weights`, `local_weights`, `correlations` and `ranks` are derived. A record built by hand renders like one produced by a study; only `validate()` and `plot_surface()` need the adapter.
+- Breaking: `gcisens.plots.plot_surface(result, adapter, ...)` takes the adapter explicitly; `StudyResult.plot_surface()` passes its own.
+- Breaking: `Comparison.METRICS` is removed; comparison rows are the union of the results' metrics, so `rho_w_wloc` appears only when a result has a reference point.
+- `StudyResult` compares by identity (`eq=False`), as it holds arrays.
+- Export and plot tests run on a hand-built record; the HTML report test asserts embedded images.
 
 ## [0.1.2] - 2026-08-29
 

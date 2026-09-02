@@ -35,11 +35,12 @@ from .diagnosis import (
     HIDDEN_INFLUENCE,
     INTERACTION_DOMINANCE,
     MODERATE_DISCREPANCY,
+    Category,
     DiagnosisThresholds,
 )
 from .export import comparison_to_latex, s2_to_latex
 from .sensitivity import SobolIndices, sobol_analysis
-from .study import Comparison, SobolStudy, StudyResult, View, compare
+from .study import Comparison, Metric, SobolStudy, StudyResult, View, compare
 from .validation import ValidationResult, validate_scores
 
 __version__ = _package_version("gcisens")
@@ -49,6 +50,7 @@ __all__ = [
     "SobolStudy",
     "StudyResult",
     "View",
+    "Metric",
     "compare",
     "Comparison",
     # builders
@@ -56,6 +58,7 @@ __all__ = [
     "esp_spotis",
     # diagnosis
     "DiagnosisThresholds",
+    "Category",
     "CATEGORIES",
     "HIDDEN_INFLUENCE",
     "INTERACTION_DOMINANCE",
