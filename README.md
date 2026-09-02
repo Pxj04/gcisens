@@ -1,5 +1,6 @@
 # gcisens
 
+<!-- about-start -->
 [![CI](https://img.shields.io/github/actions/workflow/status/Pxj04/gcisens/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/Pxj04/gcisens/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/gcisens?label=PyPI&logo=pypi&logoColor=white)](https://pypi.org/project/gcisens/)
 [![Python](https://img.shields.io/pypi/pyversions/gcisens?logo=python&logoColor=white)](https://pypi.org/project/gcisens/)
@@ -122,14 +123,60 @@ result = SobolStudy(model, bounds=bounds).run()
 ## Examples
 
 The repository includes ready-to-run examples based on the bundled IBM HR
-Attrition dataset:
+Attrition dataset (a fictional IBM Watson Analytics sample, ODbL; see
+[`examples/data/README.md`](https://github.com/Pxj04/gcisens/blob/main/examples/data/README.md)):
 
-- [`article_esp_comet.py`](examples/article_esp_comet.py) - analyses multiple
+- [`article_esp_comet.py`](https://github.com/Pxj04/gcisens/blob/main/examples/article_esp_comet.py) - analyses multiple
   ESP-COMET configurations and generates CSV, LaTeX and HTML reports.
-- [`esp_spotis_demo.py`](examples/esp_spotis_demo.py) - compares ESP-SPOTIS
+- [`esp_spotis_demo.py`](https://github.com/Pxj04/gcisens/blob/main/examples/esp_spotis_demo.py) - compares ESP-SPOTIS
   with ESP-COMET using the same expected solution point.
 
+The [methodology page](https://gcisens.readthedocs.io/en/latest/methodology.html)
+lists the assumptions behind the indices and shows how the report reacts to
+its thresholds.
+
+## Code metadata
+
+| Nr | Code metadata description | Value |
+|---|---|---|
+| C1 | Current code version | 0.1.3 |
+| C2 | Permanent link to code/repository | https://github.com/Pxj04/gcisens |
+| C3 | Permanent link to reproducible capsule | Zenodo archive of each release tag (DOI added with the release, see [CONTRIBUTING.md](https://github.com/Pxj04/gcisens/blob/main/CONTRIBUTING.md)) |
+| C4 | Legal code licence | MIT |
+| C5 | Code versioning system used | git |
+| C6 | Software code languages, tools and services used | Python |
+| C7 | Compilation requirements, operating environments and dependencies | Python >= 3.11; NumPy >= 2.3, pandas, SciPy, scikit-learn, SALib, pymcdm >= 1.4, Matplotlib |
+| C8 | Link to developer documentation/manual | https://gcisens.readthedocs.io |
+| C9 | Support for questions | [GitHub issues](https://github.com/Pxj04/gcisens/issues) |
+
+## Citing
+
+Cite the package with the metadata in
+[`CITATION.cff`](https://github.com/Pxj04/gcisens/blob/main/CITATION.cff)
+(GitHub shows a "Cite this repository" button). The two source articles are
+listed first in the references below.
+
 ## References
+
+- Śniegowski, S., Świder, A., Shekhovtsov, A., & Sałabun, W. (2026).
+  Detecting Hidden Criterion Influence When Weights Mislead in Rule-Based
+  Decision Support Systems. *30th International Conference on Knowledge-Based
+  and Intelligent Information & Engineering Systems (KES 2026)*, to appear.
+- Sałabun, W., Shekhovtsov, A., & Wątróbski, J. (2025). Variance-Based
+  Analysis of Global Criteria Importance in the ESP-COMET Method.
+  *Proceedings of the 33rd International Conference on Information Systems
+  Development (ISD 2025)*, University of Gdańsk / University of Belgrade,
+  ISBN 978-83-972632-1-5.
+- Więckowski, J., Kizielewicz, B., Shekhovtsov, A., & Sałabun, W. (2023).
+  [How do the criteria affect sustainable supplier evaluation? A case study
+  using multi-criteria decision analysis methods in a fuzzy environment
+  (local and global importance weights)](https://doi.org/10.1142/S0219622022500948).
+  *International Journal of Information Technology & Decision Making, 22*(6).
+- Shekhovtsov, A., & Sałabun, W. (2024). [Comparing Global and Local Weights
+  in Multi-Criteria Decision-Making: A COMET-Based
+  Approach](https://doi.org/10.5220/0012360700003636). *Proceedings of the
+  16th International Conference on Agents and Artificial Intelligence
+  (ICAART 2024)*.
 
 - Sobol', I. M. (2001). [Global sensitivity indices for nonlinear mathematical
   models and their Monte Carlo estimates](https://doi.org/10.1016/S0378-4754(00)00270-6).
@@ -161,4 +208,5 @@ Attrition dataset:
 ## License
 
 `gcisens` is available under the MIT License. You may use, modify and
-distribute it under its terms. See the [LICENSE](LICENSE) file for details.
+distribute it under its terms. See the
+[LICENSE](https://github.com/Pxj04/gcisens/blob/main/LICENSE) file for details.

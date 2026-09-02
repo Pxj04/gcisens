@@ -12,9 +12,12 @@ import numpy as np
 import pandas as pd
 
 
-@dataclass
+@dataclass(eq=False)
 class ValidationResult:
-    """Score separation and lift@k for a labelled dataset."""
+    """Score separation and lift@k for a labelled dataset.
+
+    Instances compare by identity (``eq=False``), as they hold arrays.
+    """
 
     groups: pd.DataFrame
     lift: pd.DataFrame

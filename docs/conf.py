@@ -1,6 +1,6 @@
 project = "gcisens"
 author = "Szymon Sniegowski and Adrianna Świder"
-copyright = "2026, gcisens contributors"
+copyright = "2026, Szymon Sniegowski"
 
 extensions = [
     "sphinx.ext.autodoc",

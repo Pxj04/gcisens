@@ -186,6 +186,53 @@ def classify(
     return diagnoses
 
 
+def sweep_thresholds(
+    criteria_names,
+    weights: np.ndarray,
+    S1: np.ndarray,
+    ST: np.ndarray,
+    base: DiagnosisThresholds | None = None,
+    **grid,
+) -> pd.DataFrame:
+    """Classify the criteria for every combination of threshold values.
+
+    Parameters
+    ----------
+    criteria_names, weights, S1, ST
+        The inputs of :func:`classify`.
+    base : DiagnosisThresholds, optional
+        Thresholds that stay fixed; defaults to :class:`DiagnosisThresholds`.
+    **grid
+        Threshold field names mapped to the values to sweep, e.g.
+        ``hidden_st_excess=[0.01, 0.03, 0.05]``. At least one is required.
+
+    Returns
+    -------
+    DataFrame
+        One row per grid point (Cartesian product, first name slowest): the
+        swept threshold columns followed by one :class:`Category` column per
+        criterion. Compare rows to see how sensitive the report is to the
+        thresholds.
+    """
+    import itertools
+    from dataclasses import fields, replace
+
+    if not grid:
+        raise ValueError("sweep_thresholds needs at least one threshold to sweep")
+    known = {f.name for f in fields(DiagnosisThresholds)}
+    unknown = sorted(set(grid) - known)
+    if unknown:
+        raise TypeError(f"unknown thresholds {unknown}; expected names from {sorted(known)}")
+    base = base or DiagnosisThresholds()
+    names = list(grid)
+    rows = []
+    for values in itertools.product(*(list(grid[name]) for name in names)):
+        settings = dict(zip(names, values))
+        diagnoses = classify(criteria_names, weights, S1, ST, replace(base, **settings))
+        rows.append({**settings, **{d.criterion: d.category for d in diagnoses}})
+    return pd.DataFrame(rows, columns=[*names, *map(str, criteria_names)])
+
+
 def diagnosis_frame(diagnoses: list[CriterionDiagnosis]) -> pd.DataFrame:
     """Diagnoses as a DataFrame."""
     return pd.DataFrame(
