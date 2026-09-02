@@ -180,7 +180,8 @@ def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
     label = label or "tab:comparison"
     df = comparison.table()
     pretty = {
-        "R2": r"$R^2$ (linear approx.)",
+        "r2_fit": r"$R^2$ (fit)",
+        "r2_samples": r"$R^2$ (uniform sample)",
         "sum_S1": r"$\sum S1$",
         "sum_ST": r"$\sum ST$",
         "sum_interaction": r"$\sum (ST - S1)$",

@@ -12,6 +12,7 @@ This file records notable changes to the project. The format follows
 - Keep `StudyResult.ranks` as a read-only compatibility view over `views`.
 - Allow local-weight sweeps to include the upper bound.
 - Expose Sobol' bootstrap and S2 significance settings.
+- Report `r2_samples`, a linear-fit R² on one uniform sample of `n_r2_samples` points (default 4096). It is computed the same way for every model, next to the source-specific `r2_fit`.
 
 ### Changed
 
@@ -22,6 +23,7 @@ This file records notable changes to the project. The format follows
 - Document `local_percent_step` and recommend the `sobol` sampler for new studies.
 - Cache the COMET weight fit and warn when its characteristic-object grid is large.
 - Include all rank correlations in comparison tables.
+- Breaking: replace the `R2` summary key and comparison row with `r2_fit` and `r2_samples`. `StudyResult.r2` stays as a compatibility alias.
 - Set the package version to 0.1.3.
 
 ## [0.1.2] - 2026-08-29
