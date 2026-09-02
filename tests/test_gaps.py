@@ -1,4 +1,6 @@
-"""Test-gap sweep from the 2026-09-02 audit (Package E, item E9)."""
+"""Behaviours the 2026-09-02 pre-submission audit found untested: LaTeX
+writers, SPOTIS local weights and types, model construction errors and the
+identity equality of the array-holding records."""
 
 from dataclasses import replace
 

@@ -17,7 +17,8 @@ parameter (:class:`DiagnosisThresholds`), not constants.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import itertools
+from dataclasses import dataclass, fields, replace
 
 import numpy as np
 import pandas as pd
@@ -214,9 +215,6 @@ def sweep_thresholds(
         criterion. Compare rows to see how sensitive the report is to the
         thresholds.
     """
-    import itertools
-    from dataclasses import fields, replace
-
     if not grid:
         raise ValueError("sweep_thresholds needs at least one threshold to sweep")
     known = {f.name for f in fields(DiagnosisThresholds)}

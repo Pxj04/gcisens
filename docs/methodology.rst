@@ -15,10 +15,11 @@ Assumptions and limitations
    * - Topic
      - What holds
    * - Input distribution
-     - Sobol' indices are computed for independent, uniform inputs over
-       ``bounds``. They describe the model over the criteria hyper-rectangle,
-       not over the distribution of real alternatives. A criterion that is
-       almost constant in the data can still carry a large index.
+     - ``gcisens`` computes Sobol' indices for independent, uniform inputs
+       over ``bounds``. The indices describe the model over the criteria
+       hyper-rectangle, not over the distribution of real alternatives. A
+       criterion that is almost constant in the data can still carry a large
+       index.
    * - Weights and ``S1`` scales
      - Weights and first-order indices live on different scales. For an
        additive linear model ``S1`` grows with the square of the weight. The
@@ -32,11 +33,12 @@ Assumptions and limitations
        for other score scales and criteria counts, and report a threshold
        sweep (below) with every diagnosis.
    * - COMET weights
-     - COMET has no declared weights. The ``w`` view is the normalised
-       absolute coefficient vector of a linear regression on the
-       characteristic objects. The sign is dropped and ``r2_fit`` reports the
-       fit quality. A low ``r2_fit`` means the linear summary explains little
-       of the model.
+     - COMET takes no weights as input. Its declared weights (the ``w``
+       view) are regression estimates: ``gcisens`` fits a linear model on
+       the characteristic objects, drops the sign of the coefficients and
+       normalises their absolute values. ``r2_fit`` reports the fit quality.
+       A low ``r2_fit`` means that the linear summary explains little of the
+       model.
    * - Negative indices
      - Small negative ``S1`` or ``ST - S1`` values are estimator noise, not
        evidence of a negative effect. Treat values inside the confidence
@@ -47,19 +49,20 @@ Assumptions and limitations
        ``num_resamples`` bootstrap draws (default 100). They are not standard
        errors.
    * - Reproducibility
-     - Article values are reproduced with NumPy 2.3 or newer. pymcdm's
+     - Use NumPy 2.3 or newer to reproduce the article values. pymcdm's
        ``ESPExpert`` detects distance ties with exact float equality, and
-       NumPy 2.3 changed float reduction; older NumPy versions give multi-ESP
+       NumPy 2.3 changed float reduction. Older NumPy versions give multi-ESP
        weights that differ by up to 0.0011 and a different ``r2_fit``.
-       The ``"saltelli"`` sampler is deterministic; ``seed`` affects only the
+       The ``"saltelli"`` sampler is deterministic. ``seed`` affects only the
        bootstrap intervals, the ``"sobol"`` sampler and ``r2_samples``.
    * - Memory
-     - The COMET characteristic-object grid is the product of the numbers of
+     - The COMET characteristic-object count is the product of the numbers of
        characteristic values per criterion, and pymcdm stores a float16
-       judgment matrix of size ``count**2``. Seven criteria with two ESPs give
-       12,288 objects and about 290 MiB. ``comet_global_weights`` warns above
-       20,000 objects. Reduce the number of criteria or ESPs when the warning
-       appears.
+       judgment matrix of size ``count**2``. Seven criteria with two ESPs
+       give up to ``4**7 = 16,384`` objects. The KES 2026 case study has
+       12,288, because the two ESPs share one value, and needs about 290 MiB.
+       ``comet_global_weights`` warns above 20,000 objects. Reduce the number
+       of criteria or ESPs when the warning appears.
 
 Threshold sensitivity: a worked example
 ---------------------------------------

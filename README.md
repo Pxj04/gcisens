@@ -141,7 +141,7 @@ its thresholds.
 |---|---|---|
 | C1 | Current code version | 0.1.3 |
 | C2 | Permanent link to code/repository | https://github.com/Pxj04/gcisens |
-| C3 | Permanent link to reproducible capsule | Zenodo archive of each release tag (DOI added with the release, see [CONTRIBUTING.md](https://github.com/Pxj04/gcisens/blob/main/CONTRIBUTING.md)) |
+| C3 | Permanent link to reproducible capsule | Not yet archived. Each release tag gets a Zenodo DOI (see [CONTRIBUTING.md](https://github.com/Pxj04/gcisens/blob/main/CONTRIBUTING.md)) |
 | C4 | Legal code licence | MIT |
 | C5 | Code versioning system used | git |
 | C6 | Software code languages, tools and services used | Python |
@@ -153,8 +153,9 @@ its thresholds.
 
 Cite the package with the metadata in
 [`CITATION.cff`](https://github.com/Pxj04/gcisens/blob/main/CITATION.cff)
-(GitHub shows a "Cite this repository" button). The two source articles are
-listed first in the references below.
+(GitHub shows a "Cite this repository" button). A Zenodo DOI for the
+archived release is pending. The two source articles are listed first in the
+references below.
 
 ## References
 
@@ -164,9 +165,9 @@ listed first in the references below.
   and Intelligent Information & Engineering Systems (KES 2026)*, to appear.
 - Sałabun, W., Shekhovtsov, A., & Wątróbski, J. (2025). Variance-Based
   Analysis of Global Criteria Importance in the ESP-COMET Method.
-  *Proceedings of the 33rd International Conference on Information Systems
-  Development (ISD 2025)*, University of Gdańsk / University of Belgrade,
-  ISBN 978-83-972632-1-5.
+  *[Proceedings of the 33rd International Conference on Information Systems
+  Development (ISD 2025)](https://aisel.aisnet.org/isd2014/proceedings2025/)*,
+  University of Gdańsk / University of Belgrade, ISBN 978-83-972632-1-5.
 - Więckowski, J., Kizielewicz, B., Shekhovtsov, A., & Sałabun, W. (2023).
   [How do the criteria affect sustainable supplier evaluation? A case study
   using multi-criteria decision analysis methods in a fuzzy environment

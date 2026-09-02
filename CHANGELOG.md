@@ -27,7 +27,6 @@ This file records notable changes to the project. The format follows
 - `SobolIndices` and `ValidationResult` compare by identity (`eq=False`), as they hold arrays.
 - Corrected the `seed` documentation: the default Saltelli sampler is deterministic, the seed drives the bootstrap intervals, the `sobol` sampler and the `r2_samples` sample.
 - The documentation "About" page includes the README instead of copying it; the docs copyright line matches the LICENSE.
-
 - Require NumPy 2.3 or newer for article reproduction.
 - Raise compiled dependency bounds to versions compatible with NumPy 2.3.
 - Require pymcdm 1.4 or newer and SALib 1.5.1 through 1.x.

@@ -15,7 +15,8 @@ pip install -e ".[dev,docs]" build twine
 ## Checks
 
 Run these from the repository root before you open a pull request. CI runs
-the same commands.
+the lint, test, coverage and documentation checks; the release workflow runs
+the package check.
 
 | Check | Command |
 |---|---|
