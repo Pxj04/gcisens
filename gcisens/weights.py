@@ -58,21 +58,45 @@ def characteristic_objects_grid(cvalues) -> np.ndarray:
     return np.array(list(itertools.product(*cvalues)), dtype=float)
 
 
-def comet_global_weights(model, bounds: np.ndarray) -> RegressionWeights:
-    """Global weights of a COMET model: regression on characteristic objects."""
-    grid_size = math.prod(len(values) for values in model.cvalues)
-    if grid_size > 20_000:
-        mej_mib = grid_size**2 * np.dtype(np.float16).itemsize / 1024**2
+#: Characteristic-object count above which :func:`warn_large_grid` warns.
+LARGE_GRID_OBJECTS = 20_000
+
+
+def characteristic_objects_count(grid_lines) -> int:
+    """Number of characteristic objects: the product of the grid sizes."""
+    return math.prod(len(values) for values in grid_lines)
+
+
+def warn_large_grid(grid_lines, limit: int | None = None) -> int:
+    """Warn when a COMET grid is large; returns the characteristic-object count.
+
+    pymcdm stores a float16 judgment matrix with ``count**2`` entries, so its
+    memory grows with the square of the count. Call this *before* the COMET
+    model is built, as :func:`gcisens.esp_comet` does, because pymcdm
+    allocates the matrix in the constructor.
+    """
+    limit = LARGE_GRID_OBJECTS if limit is None else limit
+    count = characteristic_objects_count(grid_lines)
+    if count > limit:
+        mej_mib = count**2 * np.dtype(np.float16).itemsize / 1024**2
         warnings.warn(
-            f"COMET has {grid_size:,} characteristic objects; pymcdm's float16 "
+            f"COMET has {count:,} characteristic objects; pymcdm's float16 "
             f"judgment matrix needs about {mej_mib:,.1f} MiB because its size grows with "
             "the square of the grid size",
             UserWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
-    grid = characteristic_objects_grid(model.cvalues)
-    preferences = np.asarray(model(grid)).ravel()
-    return regression_weights(grid, preferences, bounds)
+    return count
+
+
+def grid_regression_weights(score_fn, grid_lines, bounds: np.ndarray) -> RegressionWeights:
+    """Global weights by regression on the Cartesian grid of ``grid_lines``.
+
+    For a COMET model the grid is its characteristic objects and ``score_fn``
+    its preference function (Sałabun et al., ISD 2025, eqs. (1)-(2)).
+    """
+    grid = characteristic_objects_grid(grid_lines)
+    return regression_weights(grid, np.asarray(score_fn(grid)).ravel(), bounds)
 
 
 def sweep_local_weights(

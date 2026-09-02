@@ -160,12 +160,14 @@ def test_only_the_adapter_modules_know_the_model_internals():
     import inspect
     import re
 
-    from gcisens import export, plots, study
+    from gcisens import diagnosis, export, plots, sensitivity, study, validation, weights
 
-    for module in (study, plots, export):
+    for module in (study, plots, export, weights, sensitivity, diagnosis, validation):
         source = inspect.getsource(module)
         assert "declared_weights_r2" not in source
         assert not re.search(r"isinstance\([^)]*COMET", source)
         assert "META_ATTR" not in source
         assert "_gcisens_meta" not in source
         assert "adapter.model" not in source
+        assert ".cvalues" not in source
+        assert "expert_function" not in source

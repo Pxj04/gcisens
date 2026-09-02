@@ -19,6 +19,7 @@ from .adapters import (
     validate_esps,
     validate_weights,
 )
+from .weights import warn_large_grid
 
 
 def esp_comet(
@@ -58,9 +59,11 @@ def esp_comet(
     Notes
     -----
     The characteristic-object count is the product of the numbers of
-    characteristic values per criterion. pymcdm stores a float16 matrix with
-    roughly ``2 * count**2`` bytes. Weight analysis warns when the count is
-    above 20,000.
+    characteristic values per criterion. pymcdm allocates a float16 matrix
+    with roughly ``2 * count**2`` bytes in the ``COMET`` constructor, so this
+    builder warns *before* building the model when the count is above
+    20,000. Reduce the number of criteria or ESPs, or pass smaller
+    ``cvalues``, when the warning appears.
     """
     bounds = validate_bounds(bounds)
     m = bounds.shape[0]
@@ -70,6 +73,7 @@ def esp_comet(
         expert = ESPExpert(esps=esps, bounds=bounds)
     if cvalues is None:
         cvalues = expert.make_cvalues_psi()
+    warn_large_grid(cvalues)
     model = COMET(cvalues, expert)
     setattr(
         model,

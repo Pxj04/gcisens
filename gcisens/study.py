@@ -127,7 +127,9 @@ class SobolStudy:
         ``"saltelli"`` sampler is deterministic, so ``S1``, ``ST`` and ``S2``
         do not change with the seed.
     sampler : {"saltelli", "sobol"}
-        Sampling scheme; "saltelli" matches the source articles.
+        Sampling scheme. The default ``"saltelli"`` matches the source
+        articles but SALib deprecates it; use ``"sobol"`` (scrambled Sobol'
+        sequence) for new studies.
     num_resamples : int
         Number of bootstrap resamples used for Sobol' confidence intervals.
     conf_level : float
