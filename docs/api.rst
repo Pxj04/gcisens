@@ -12,6 +12,9 @@ Workflow
 .. autoclass:: gcisens.StudyResult
    :members:
 
+.. autoclass:: gcisens.View
+   :members:
+
 .. autoclass:: gcisens.Comparison
    :members:
 

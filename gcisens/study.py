@@ -40,6 +40,31 @@ def _spearman(a, b) -> float:
     return float(spearmanr(a, b).statistic)
 
 
+@dataclass
+class View:
+    """One view of criteria importance: a value per criterion and the ranking
+    it induces.
+
+    A study has an ordered set of views — ``w`` (declared / global weights),
+    ``w_loc`` (local weights, present only with a reference point), ``S1``
+    and ``ST``. The results table, the LaTeX export and the ranking plot all
+    walk :attr:`StudyResult.views` in that order, so whether the optional
+    view exists is decided once, when the study runs.
+    """
+
+    #: Column name in tables and CSV files (``w``, ``w_loc``, ``S1``, ``ST``).
+    key: str
+    #: Math label shared by LaTeX and matplotlib, e.g. ``$w_{\mathrm{loc}}$``.
+    label: str
+    values: np.ndarray
+    #: Ranks induced by ``values`` (see :func:`gcisens.diagnosis.rank_descending`).
+    ranks: np.ndarray = field(init=False)
+
+    def __post_init__(self):
+        self.values = np.asarray(self.values, dtype=float)
+        self.ranks = rank_descending(self.values)
+
+
 class SobolStudy:
     """Variance-based sensitivity study of an MCDA scoring model.
 
@@ -108,7 +133,7 @@ class SobolStudy:
         ----------
         reference_point : array-like, optional
             Point in the criteria space at which local weights are computed.
-            When omitted, the local-weight column is left out.
+            When omitted, the ``w_loc`` view is left out.
         """
         adapter = self.adapter
         names = adapter.criteria_names
@@ -162,11 +187,11 @@ class SobolStudy:
         else:
             point = None
 
-        # 4. Rankings + Spearman correlations.
-        ranks = {"w": rank_descending(weights_arr), "S1": rank_descending(sobol.S1),
-                 "ST": rank_descending(sobol.ST)}
+        # 4. Views (each ranks itself) + Spearman correlations.
+        views = [View("w", "$w$", weights_arr)]
         if local is not None:
-            ranks["w_loc"] = rank_descending(local)
+            views.append(View("w_loc", r"$w_{\mathrm{loc}}$", local))
+        views += [View("S1", "$S1$", sobol.S1), View("ST", "$ST$", sobol.ST)]
         # Tie-aware Spearman on the raw values (equivalent to rank correlation,
         # but exact ties — e.g. two zero weights — get average ranks).
         correlations = {
@@ -188,7 +213,7 @@ class SobolStudy:
             local_weights=local,
             reference_point=point,
             sobol=sobol,
-            ranks=ranks,
+            views=views,
             correlations=correlations,
             diagnoses=diagnoses,
             thresholds=self.thresholds,
@@ -213,7 +238,7 @@ class StudyResult:
     local_weights: np.ndarray | None
     reference_point: np.ndarray | None
     sobol: SobolIndices
-    ranks: dict
+    views: list[View]
     correlations: dict
     diagnoses: list[CriterionDiagnosis]
     thresholds: DiagnosisThresholds
@@ -225,25 +250,15 @@ class StudyResult:
 
     # ------------------------------------------------------------------ tables
     def table(self) -> pd.DataFrame:
-        """Main results table: weights, Sobol' indices, ranks, category."""
+        """Main results table: one value and one ``Rank_`` column per view,
+        Sobol' confidence columns, diagnosis category."""
         s = self.sobol
-        data = {"Criterion": self.criteria_names, "w": self.weights}
-        if self.local_weights is not None:
-            data["w_loc"] = self.local_weights
-        data.update(
-            {
-                "S1": s.S1,
-                "ST": s.ST,
-                "ST_minus_S1": s.interaction,
-                "S1_conf": s.S1_conf,
-                "ST_conf": s.ST_conf,
-                "Rank_w": self.ranks["w"],
-                "Rank_S1": self.ranks["S1"],
-                "Rank_ST": self.ranks["ST"],
-            }
-        )
-        if self.local_weights is not None:
-            data["Rank_w_loc"] = self.ranks["w_loc"]
+        data = {"Criterion": self.criteria_names}
+        for v in self.views:
+            data[v.key] = v.values
+        data.update({"ST_minus_S1": s.interaction, "S1_conf": s.S1_conf, "ST_conf": s.ST_conf})
+        for v in self.views:
+            data[f"Rank_{v.key}"] = v.ranks
         data["Category"] = [d.category for d in self.diagnoses]
         return pd.DataFrame(data)
 

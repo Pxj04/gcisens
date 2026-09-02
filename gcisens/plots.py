@@ -59,13 +59,10 @@ def plot_rankings(result, ax=None):
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4.6))
     names = result.criteria_names
-    views = [v for v in ("w", "w_loc", "S1", "ST") if v in result.ranks]
-    view_labels = {"w": "$w$", "w_loc": "$w_{loc}$", "S1": "$S1$", "ST": "$ST$"}
-    rankings = np.array([result.ranks[v] for v in views])
+    views = result.views
+    rankings = np.array([v.ranks for v in views])
 
-    ax = pymcdm_visuals.ranking_flows(
-        rankings, labels=[view_labels[v] for v in views], ax=ax
-    )
+    ax = pymcdm_visuals.ranking_flows(rankings, labels=[v.label for v in views], ax=ax)
 
     # ranking_flows labels alternatives $A_1$..$A_m$; swap in criteria names.
     pattern = re.compile(r"^\$A_\{(\d+)\}\$$")
