@@ -8,6 +8,7 @@ writing one new adapter here and nothing else.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 from pymcdm.methods import COMET, SPOTIS
@@ -147,15 +148,18 @@ class CometAdapter(ModelAdapter):
                 ) from error
             raise
 
-    def declared_weights(self):
+    @cached_property
+    def weights_fit(self):
+        """Regression fit used for declared weights and fit quality."""
         from .weights import comet_global_weights
 
-        self._weights_fit = comet_global_weights(self.model, self.bounds)
-        return self._weights_fit.weights
+        return comet_global_weights(self.model, self.bounds)
+
+    def declared_weights(self):
+        return self.weights_fit.weights
 
     def declared_weights_r2(self) -> float | None:
-        fit = getattr(self, "_weights_fit", None)
-        return None if fit is None else fit.r2
+        return self.weights_fit.r2
 
     def local_weights(self, point, percent_step=0.01):
         return np.asarray(

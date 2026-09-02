@@ -65,7 +65,7 @@ and re-exported by `gcisens` for a consistent interface.
 
 | Model | Weight handling | Notes |
 |---|---|---|
-| `esp_comet(esps, bounds)` or any `COMET` | estimated by regression | supports one or multiple ESPs |
+| `esp_comet(esps, bounds)` or any `COMET` | estimated by regression | supports one or multiple ESPs; pymcdm memory use grows with the square of the characteristic-object count |
 | `esp_spotis(esp, bounds, weights)` or any `SPOTIS` | supplied with the model | uses distance scores, where lower means closer |
 | any callable `f(X) -> scores` | optional | enables sensitivity analysis of custom scoring models |
 

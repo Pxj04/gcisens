@@ -22,8 +22,8 @@ _CATEGORY_COLORS = {
 
 # --------------------------------------------------------------------- helpers
 def _fmt(x, digits: int = 4) -> str:
-    if x is None or (isinstance(x, float) and np.isnan(x)):
-        return ""
+    if x is None or (isinstance(x, (float, np.floating)) and np.isnan(x)):
+        return "n/a"
     return f"{x:.{digits}f}"
 
 
@@ -186,6 +186,8 @@ def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
         "sum_interaction": r"$\sum (ST - S1)$",
         "rho_w_S1": r"$\rho(w, S1)$",
         "rho_w_ST": r"$\rho(w, ST)$",
+        "rho_S1_ST": r"$\rho(S1, ST)$",
+        "rho_w_wloc": r"$\rho(w, w_{\mathrm{loc}})$",
     }
     cols = "|l|" + "c|" * len(df.columns)
     lines = [

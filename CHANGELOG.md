@@ -10,6 +10,8 @@ This file records notable changes to the project. The format follows
 - Test the package version against installed distribution metadata.
 - Check minimum dependency versions, documentation, formatting and coverage in CI.
 - Keep `StudyResult.ranks` as a read-only compatibility view over `views`.
+- Allow local-weight sweeps to include the upper bound.
+- Expose Sobol' bootstrap and S2 significance settings.
 
 ### Changed
 
@@ -18,6 +20,8 @@ This file records notable changes to the project. The format follows
 - Require pymcdm 1.4 or newer and SALib 1.5.1 through 1.x.
 - Use one tie-aware rank definition across tables, diagnosis and plots.
 - Document `local_percent_step` and recommend the `sobol` sampler for new studies.
+- Cache the COMET weight fit and warn when its characteristic-object grid is large.
+- Include all rank correlations in comparison tables.
 - Set the package version to 0.1.3.
 
 ## [0.1.2] - 2026-08-29

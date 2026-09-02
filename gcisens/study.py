@@ -100,6 +100,11 @@ class SobolStudy:
         Seed for bootstrap confidence intervals (and the "sobol" sampler).
     sampler : {"saltelli", "sobol"}
         Sampling scheme; "saltelli" matches the source articles.
+    num_resamples : int
+        Number of bootstrap resamples used for Sobol' confidence intervals.
+    conf_level : float
+        Confidence level for the Sobol' interval half-widths. The default is
+        0.95.
     thresholds : DiagnosisThresholds, optional
         Decision-rule thresholds for the discrepancy diagnosis.
     local_percent_step : float
@@ -126,6 +131,8 @@ class SobolStudy:
         second_order: bool = True,
         seed: int | None = None,
         sampler: str = "saltelli",
+        num_resamples: int = 100,
+        conf_level: float = 0.95,
         thresholds: DiagnosisThresholds | None = None,
         local_percent_step: float = 0.01,
     ):
@@ -134,6 +141,8 @@ class SobolStudy:
         self.n_samples = validate_n_samples(n_samples)
         self.second_order = bool(second_order)
         self.seed = seed
+        self.num_resamples = num_resamples
+        self.conf_level = conf_level
         self.thresholds = thresholds or DiagnosisThresholds()
         self.local_percent_step = local_percent_step
 
@@ -173,6 +182,8 @@ class SobolStudy:
                 second_order=self.second_order,
                 seed=self.seed,
                 sampler=self.sampler,
+                num_resamples=self.num_resamples,
+                conf_level=self.conf_level,
             )
 
         # 2. Declared / global weights + linear-fit quality (R^2).
@@ -284,14 +295,19 @@ class StudyResult:
 
     def s2_table(self) -> pd.DataFrame:
         """Pairwise interaction indices sorted by absolute ``S2`` value."""
-        return self.sobol.s2_pairs()
+        return self.sobol.s2_pairs(self.thresholds)
 
     def diagnosis(self) -> pd.DataFrame:
         """Sensitivity Discrepancy Report: category + rationale per criterion."""
         return diagnosis_frame(self.diagnoses)
 
     def summary(self) -> pd.Series:
-        """Configuration-level metrics (cf. KES 2026, Table 5)."""
+        """Configuration-level metrics (cf. KES 2026, Table 5).
+
+        A Spearman correlation is NaN when either input view is constant,
+        because its ranks have zero variance. LaTeX and HTML exports display
+        this value as ``n/a``.
+        """
         s = self.sobol
         data = {
             "R2": self.r2,
@@ -302,6 +318,8 @@ class StudyResult:
             "n_samples": s.n_samples,
             "n_evaluations": s.n_evaluations,
             "sampler": s.sampler,
+            "num_resamples": s.num_resamples,
+            "conf_level": s.conf_level,
             "weights_source": self.weights_source,
         }
         return pd.Series(data)
@@ -397,6 +415,8 @@ class Comparison:
         "sum_interaction",
         "rho_w_S1",
         "rho_w_ST",
+        "rho_S1_ST",
+        "rho_w_wloc",
     )
 
     def __init__(self, results: dict[str, StudyResult]):
@@ -409,7 +429,7 @@ class Comparison:
         cols = {}
         for name, res in self.results.items():
             summary = res.summary()
-            cols[name] = [summary[m] for m in self.METRICS]
+            cols[name] = [summary.get(m, float("nan")) for m in self.METRICS]
         return pd.DataFrame(cols, index=list(self.METRICS))
 
     def to_latex(self, path=None, caption=None, label=None) -> str:

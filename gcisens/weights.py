@@ -10,6 +10,8 @@ algorithm of Więckowski et al. (2023), the same one implemented in
 from __future__ import annotations
 
 import itertools
+import math
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -58,19 +60,36 @@ def characteristic_objects_grid(cvalues) -> np.ndarray:
 
 def comet_global_weights(model, bounds: np.ndarray) -> RegressionWeights:
     """Global weights of a COMET model: regression on characteristic objects."""
+    grid_size = math.prod(len(values) for values in model.cvalues)
+    if grid_size > 20_000:
+        mej_mib = grid_size**2 * np.dtype(np.float16).itemsize / 1024**2
+        warnings.warn(
+            f"COMET has {grid_size:,} characteristic objects; pymcdm's float16 "
+            f"judgment matrix needs about {mej_mib:,.1f} MiB because its size grows with "
+            "the square of the grid size",
+            UserWarning,
+            stacklevel=2,
+        )
     grid = characteristic_objects_grid(model.cvalues)
     preferences = np.asarray(model(grid)).ravel()
     return regression_weights(grid, preferences, bounds)
 
 
-def sweep_local_weights(score_fn, point, bounds, percent_step: float = 0.01) -> np.ndarray:
+def sweep_local_weights(
+    score_fn,
+    point,
+    bounds,
+    percent_step: float = 0.01,
+    include_upper: bool = False,
+) -> np.ndarray:
     """Local weights at ``point``: preference range under a one-criterion sweep.
 
     For each criterion the point is swept over the criterion's full domain
     (holding the others fixed) and the range (max - min) of the model score is
-    recorded; ranges are normalised to sum to 1. This mirrors
-    ``pymcdm.methods.comet_tools.get_local_weights`` but works for any
-    scoring function, not only COMET.
+    recorded; ranges are normalised to sum to 1. By default, the sweep excludes
+    the upper bound, matching ``pymcdm.methods.comet_tools.get_local_weights``.
+    Set ``include_upper=True`` to evaluate both bounds. This implementation
+    works for any scoring function, not only COMET.
     """
     point = np.asarray(point, dtype=float).ravel()
     m = bounds.shape[0]
@@ -79,8 +98,11 @@ def sweep_local_weights(score_fn, point, bounds, percent_step: float = 0.01) -> 
     ranges = np.zeros(m)
     for i in range(m):
         lo, hi = bounds[i]
-        step = (hi - lo) * percent_step
-        swept = np.arange(lo, hi, step)
+        if include_upper:
+            swept = np.linspace(lo, hi, round(1 / percent_step) + 1)
+        else:
+            step = (hi - lo) * percent_step
+            swept = np.arange(lo, hi, step)
         candidates = np.tile(point, (len(swept), 1))
         candidates[:, i] = swept
         scores = score_fn(candidates)

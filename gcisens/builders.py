@@ -53,6 +53,13 @@ def esp_comet(
     -------
     COMET
         A plain :class:`pymcdm.methods.COMET` instance with gcisens metadata.
+
+    Notes
+    -----
+    The characteristic-object count is the product of the numbers of
+    characteristic values per criterion. pymcdm stores a float16 matrix with
+    roughly ``2 * count**2`` bytes. Weight analysis warns when the count is
+    above 20,000.
     """
     esps = np.atleast_2d(np.asarray(esps, dtype=float))
     bounds = validate_bounds(bounds)
