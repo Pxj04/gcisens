@@ -13,6 +13,7 @@ This file records notable changes to the project. The format follows
 - Allow local-weight sweeps to include the upper bound.
 - Expose Sobol' bootstrap and S2 significance settings.
 - Report `r2_samples`, a linear-fit R² on one uniform sample of `n_r2_samples` points (default 4096). It is computed the same way for every model, next to the source-specific `r2_fit`.
+- Accept `esps` in `SobolStudy` so surface plots of callable models can mark Expected Solution Points.
 
 ### Changed
 
@@ -24,6 +25,10 @@ This file records notable changes to the project. The format follows
 - Cache the COMET weight fit and warn when its characteristic-object grid is large.
 - Include all rank correlations in comparison tables.
 - Breaking: replace the `R2` summary key and comparison row with `r2_fit` and `r2_samples`. `StudyResult.r2` stays as a compatibility alias.
+- Breaking: `ModelAdapter.declared_weights()` returns a `DeclaredWeights` record (weights, source label, optional R²); `CometAdapter.declared_weights_r2()` is removed.
+- Adapters expose `esps` and `grid_lines()`; `plot_surface` draws every model, including callables, through the adapter and no longer special-cases two-criteria COMET models.
+- Use one range-sweep implementation for local weights of every model (identical values to pymcdm's `get_local_weights` on COMET).
+- Raise `ValueError` when an explicit `SobolStudy` argument differs from the metadata of a model built with `esp_comet` or `esp_spotis`.
 - Set the package version to 0.1.3.
 
 ## [0.1.2] - 2026-08-29

@@ -91,3 +91,32 @@ def test_plot_surface_spotis():
     ax = result.plot_surface(criteria=(0, 1))
     # ESP recovered from the SPOTIS model itself and marked on the plot.
     assert any("ESP" in t.get_text() for t in ax.texts)
+
+
+def _additive(X):
+    X = np.atleast_2d(X)
+    return 0.7 * X[:, 0] / 10 + 0.3 * X[:, 1] / 5
+
+
+def test_plot_surface_callable_model_marks_given_esps():
+    bounds = np.array([[0.0, 10.0], [0.0, 5.0]])
+    result = SobolStudy(_additive, bounds=bounds, n_samples=32, seed=0).run()
+
+    without = result.plot_surface(criteria=(0, 1))
+    with_esps = result.plot_surface(criteria=(0, 1), esps=[[7, 2], [3, 4]])
+
+    assert not any("ESP" in t.get_text() for t in without.texts)
+    assert [t.get_text() for t in with_esps.texts if "ESP" in t.get_text()] == [
+        "$ESP_{1}$",
+        "$ESP_{2}$",
+    ]
+
+
+def test_plot_surface_callable_model_uses_study_esps():
+    bounds = np.array([[0.0, 10.0], [0.0, 5.0]])
+    result = SobolStudy(_additive, bounds=bounds, esps=[[7, 2]], n_samples=32, seed=0).run()
+
+    ax = result.plot_surface()
+
+    assert any("ESP" in t.get_text() for t in ax.texts)
+    assert ax.get_title() == ""
