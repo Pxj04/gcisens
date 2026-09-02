@@ -248,6 +248,15 @@ class StudyResult:
     def criteria_names(self) -> list[str]:
         return self.sobol.criteria_names
 
+    @property
+    def ranks(self) -> dict[str, np.ndarray]:
+        """Ranks per view key (``w``, ``w_loc``, ``S1``, ``ST``).
+
+        A read-only view over :attr:`views`, kept so that code written
+        against the ``ranks`` dict of gcisens <= 0.1.2 keeps working.
+        """
+        return {v.key: v.ranks for v in self.views}
+
     # ------------------------------------------------------------------ tables
     def table(self) -> pd.DataFrame:
         """Main results table: one value and one ``Rank_`` column per view,
