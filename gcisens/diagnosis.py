@@ -24,35 +24,39 @@ import pandas as pd
 
 
 class Category(str):
-    """A discrepancy category: the ``str`` used in tables and CSV files,
-    carrying its presentation (a display ``label`` and a ``color`` for HTML
-    badges) so that renderers never key on the raw name.
+    """A discrepancy category with its presentation.
 
-    Compares and hashes as its name, so ``HIDDEN_INFLUENCE == "hidden
-    influence"`` holds and the constants work as dict keys and set members.
+    The value is the name used in tables and CSV files. It compares and
+    hashes as a plain ``str``, so ``HIDDEN_INFLUENCE == "hidden influence"``
+    holds. The ``label`` is the display text and ``color`` is the badge
+    colour of the HTML report, so renderers never key on the raw name.
     """
 
     label: str
     color: str
 
-    def __new__(cls, name: str, label: str | None = None, color: str = "#8a8a8a"):
+    def __new__(cls, name: str, *, label: str | None = None, color: str):
         obj = super().__new__(cls, name)
         obj.label = label if label is not None else name[:1].upper() + name[1:]
         obj.color = color
         return obj
 
-    def __getnewargs__(self):
-        return (str(self), self.label, self.color)
+    def __getnewargs_ex__(self):  # copies and pickles keep label and color
+        return (str(self),), {"label": self.label, "color": self.color}
 
     @classmethod
-    def of(cls, value) -> Category:
-        """The category constant for a name; a :class:`Category` passes through."""
-        if isinstance(value, cls):
-            return value
+    def of(cls, name) -> Category:
+        """The category constant with this name.
+
+        A :class:`Category` that is not one of the constants (a custom
+        category) passes through unchanged.
+        """
         for category in CATEGORIES:
-            if category == value:
+            if category == name:
                 return category
-        raise ValueError(f"unknown category {value!r}; expected one of {list(CATEGORIES)}")
+        if isinstance(name, cls):
+            return name
+        raise ValueError(f"unknown category {name!r}; expected one of {list(CATEGORIES)}")
 
 
 HIDDEN_INFLUENCE = Category("hidden influence", color="#e37e7e")

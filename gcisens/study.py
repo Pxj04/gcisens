@@ -41,6 +41,10 @@ from .weights import RegressionWeights, regression_weights
 logger = logging.getLogger("gcisens")
 
 
+def _nan_if_none(value) -> float:
+    return float("nan") if value is None else float(value)
+
+
 def _spearman(a, b) -> float:
     """Spearman correlation; NaN (without warnings) for constant inputs."""
     if np.ptp(a) == 0 or np.ptp(b) == 0:
@@ -302,16 +306,20 @@ class StudyResult:
     """The outcome of a :class:`SobolStudy` run: a plain record of the
     numbers, with reporting helpers.
 
-    The record holds the views (``w``, optional ``w_loc``, ``S1``, ``ST``),
-    the Sobol' indices, the per-criterion diagnoses, the two R² values and,
-    once :meth:`validate` has run, the validation. Everything else
-    (:attr:`weights`, :attr:`ranks`, :attr:`correlations`, :attr:`metrics`,
-    :meth:`table`, :meth:`summary`) is derived from these fields, so a
-    record built by hand renders exactly like one produced by a study.
+    The record holds:
 
-    The model itself is not part of the numbers. :attr:`adapter` is an
-    optional handle that only :meth:`validate` and :meth:`plot_surface` need
-    (they score new points); every table, export and other plot works on a
+    - the views ``w``, ``w_loc`` (optional), ``S1`` and ``ST``;
+    - the Sobol' indices and the per-criterion diagnoses;
+    - the two R² values and the run settings;
+    - the validation, once :meth:`validate` has run.
+
+    Weights, ranks, correlations, metrics, tables and the summary are
+    derived from these fields. A record built by hand therefore renders
+    exactly like one produced by a study.
+
+    The model is not part of the numbers. :attr:`adapter` is an optional
+    handle. Only :meth:`validate` and :meth:`plot_surface` need it, because
+    they score new points. Every table, export and other plot works on a
     record without it.
     """
 
@@ -346,6 +354,12 @@ class StudyResult:
         keys = [v.key for v in self.views]
         if "w" not in keys or "S1" not in keys or "ST" not in keys:
             raise ValueError(f"views must include 'w', 'S1' and 'ST', got {keys}")
+        m = len(self.criteria_names)
+        for v in self.views:
+            if len(v.values) != m:
+                raise ValueError(f"view {v.key!r} has {len(v.values)} values for {m} criteria")
+        if len(self.diagnoses) != m:
+            raise ValueError(f"{len(self.diagnoses)} diagnoses for {m} criteria")
         if self.reference_point is not None:
             self.reference_point = np.asarray(self.reference_point, dtype=float).ravel()
 
@@ -414,8 +428,8 @@ class StudyResult:
         Table 5). ``rho_w_wloc`` is present only with a reference point."""
         s = self.sobol
         values = {
-            "r2_fit": float("nan") if self.r2_fit is None else self.r2_fit,
-            "r2_samples": float("nan") if self.r2_samples is None else self.r2_samples,
+            "r2_fit": _nan_if_none(self.r2_fit),
+            "r2_samples": _nan_if_none(self.r2_samples),
             "sum_S1": float(s.S1.sum()),
             "sum_ST": float(s.ST.sum()),
             "sum_interaction": float(s.interaction.sum()),
@@ -474,10 +488,10 @@ class StudyResult:
         return pd.Series(data)
 
     # -------------------------------------------------------------- validation
-    def _require_adapter(self, what: str) -> ModelAdapter:
+    def _require_adapter(self, operation: str) -> ModelAdapter:
         if self.adapter is None:
             raise ValueError(
-                f"{what} scores new points and needs the model: this result has no "
+                f"{operation} scores new points and needs the model: this result has no "
                 "adapter (it was built by hand, not by SobolStudy.run)"
             )
         return self.adapter

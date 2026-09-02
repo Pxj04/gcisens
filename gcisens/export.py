@@ -227,6 +227,12 @@ def _df_to_html(df, float_digits: int = 4) -> str:
     return formatted.to_html(index=False, border=0, escape=True)
 
 
+def _plot_surface(result, ax=None):
+    from . import plots
+
+    return plots.plot_surface(result, result.adapter, ax=ax)
+
+
 def _fig_to_base64(fig) -> str:
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
@@ -292,7 +298,7 @@ def to_html(
                 sections.append(("Interactions", plots.plot_s2_heatmap))
             sections.append(("Rankings", plots.plot_rankings))
             if result.adapter is not None:  # the surface scores new points
-                sections.append(("Decision surface", lambda r: plots.plot_surface(r, r.adapter)))
+                sections.append(("Decision surface", _plot_surface))
             if result.validation is not None:
                 sections.append(("Score distributions", plots.plot_validation))
             parts.append("<h2>Plots</h2>")
@@ -303,6 +309,8 @@ def to_html(
                     f"<img alt='{name}' src='data:image/png;base64,{_fig_to_base64(fig)}'>"
                 )
                 plt.close(fig)
+            if result.adapter is None:
+                parts.append("<p class='dim'>Decision surface omitted: no model attached.</p>")
         except Exception as exc:  # noqa: BLE001 - the report must not fail on plotting
             warnings.warn(f"Plots skipped: {exc!r}", UserWarning, stacklevel=2)
             parts.append(f"<p class='dim'>Plots skipped: {html.escape(str(exc))}</p>")

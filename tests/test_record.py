@@ -1,5 +1,7 @@
 """StudyResult is a plain record: renderers and tests need no model."""
 
+import copy
+
 import numpy as np
 import pytest
 
@@ -80,7 +82,8 @@ def test_html_report_of_a_record_embeds_plots_and_skips_the_surface(tmp_path, re
     text = record.to_html(tmp_path / "report.html").read_text()
     assert "<img" in text
     assert "Plots skipped" not in text
-    assert "Decision surface" not in text
+    assert "alt='Decision surface'" not in text
+    assert "Decision surface omitted" in text
     assert "Validation" in text
 
 
@@ -106,6 +109,22 @@ def test_categories_carry_label_and_colour():
     assert diagnosis.category is HIDDEN_INFLUENCE
     with pytest.raises(ValueError, match="category"):
         CriterionDiagnosis("A", "no such category", "detail")
+    # Copies keep the presentation and resolve back to the constant.
+    copied = copy.deepcopy(HIDDEN_INFLUENCE)
+    assert (copied.label, copied.color) == (HIDDEN_INFLUENCE.label, HIDDEN_INFLUENCE.color)
+    assert CriterionDiagnosis("A", copied, "detail").category is HIDDEN_INFLUENCE
+
+
+def test_record_rejects_views_of_the_wrong_length(record):
+    from dataclasses import replace
+
+    from gcisens import View
+
+    short = [View("w", "$w$", [0.5, 0.5]) if v.key == "w" else v for v in record.views]
+    with pytest.raises(ValueError, match="3 criteria"):
+        replace(record, views=short)
+    with pytest.raises(ValueError, match="diagnoses"):
+        replace(record, diagnoses=record.diagnoses[:2])
 
 
 def test_html_badges_use_the_category_colours(tmp_path, record):
