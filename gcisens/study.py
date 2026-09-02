@@ -92,6 +92,10 @@ class SobolStudy:
         Declared weights — required for SPOTIS, optional for callables.
     types : ndarray, optional
         Criteria types for SPOTIS (ignored when the model has an ESP).
+    esps : ndarray of shape (k, m), optional
+        Expected Solution Points marked on surface plots. Recovered from
+        models built with the builders or from pymcdm ESP models; give them
+        for a callable.
     n_samples : int
         Saltelli base sample size N (total evaluations: ``N * (2m + 2)``).
     second_order : bool
@@ -131,6 +135,7 @@ class SobolStudy:
         criteria_names=None,
         weights=None,
         types=None,
+        esps=None,
         n_samples: int = 2048,
         second_order: bool = True,
         seed: int | None = None,
@@ -141,7 +146,7 @@ class SobolStudy:
         local_percent_step: float = 0.01,
         n_r2_samples: int = 4096,
     ):
-        self.adapter = make_adapter(model, bounds, criteria_names, weights, types)
+        self.adapter = make_adapter(model, bounds, criteria_names, weights, types, esps)
         self.n_r2_samples = self._validate_n_r2_samples(n_r2_samples, self.adapter.n_criteria)
         self.sampler = validate_sampler(sampler)
         self.n_samples = validate_n_samples(n_samples)
@@ -205,12 +210,8 @@ class SobolStudy:
             weights_arr, weights_source = sample_fit.weights, "regression (samples)"
             r2_fit = sample_fit.r2
         else:
-            weights_arr = np.asarray(declared, dtype=float)
-            r2_fn = getattr(adapter, "declared_weights_r2", None)
-            r2_fit = r2_fn() if callable(r2_fn) else None
-            weights_source = (
-                "regression (characteristic objects)" if r2_fit is not None else "declared"
-            )
+            weights_arr = np.asarray(declared.weights, dtype=float)
+            weights_source, r2_fit = declared.source, declared.r2
 
         # 3. Local weights at the reference point.
         local = None
@@ -421,8 +422,8 @@ class StudyResult:
         return plots.plot_validation(self, ax=ax)
 
     def plot_surface(self, criteria=None, at=None, esps=None, num=100, ax=None):
-        """Decision surface over two criteria with the evaluation grid and ESPs
-        (cf. ISD 2025, Figs. 1-2); a 2-D slice for models with more criteria."""
+        """Decision surface over two criteria with the adapter's grid lines and
+        ESPs (cf. ISD 2025, Figs. 1-2); a 2-D slice for models with more criteria."""
         from . import plots
 
         return plots.plot_surface(self, criteria=criteria, at=at, esps=esps, num=num, ax=ax)

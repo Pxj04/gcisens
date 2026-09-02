@@ -55,7 +55,7 @@ The workflow combines `gcisens` code with established implementations from
 | Complete workflow | `SobolStudy.run(reference_point=None)` | Coordinates sampling, model evaluation, weight analysis, ranking and diagnosis in `gcisens` |
 | Sobol' indices | `sobol_analysis(adapter.scores, adapter.bounds, names, ...)` | Wraps SALib's Sobol or Saltelli sampler and Sobol analyser to calculate S1, ST and S2 indices with confidence intervals |
 | Global weights | `comet_global_weights(model, bounds)` | Builds the COMET characteristic-object grid and uses scikit-learn's `LinearRegression` to estimate criterion weights |
-| Local weights | `adapter.local_weights(point, ...)` | Uses pymcdm's `get_local_weights` for COMET and the `gcisens` range-sweep implementation for SPOTIS or custom models |
+| Local weights | `adapter.local_weights(point, ...)` | One `gcisens` range-sweep implementation for every model; on COMET it gives the values of pymcdm's `get_local_weights` |
 | Discrepancy diagnosis | `classify(criteria_names, weights, S1, ST, ...)` | Applies the `gcisens` classification rules configured through `DiagnosisThresholds` |
 
 ## Supported models

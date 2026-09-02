@@ -1,12 +1,15 @@
 """Matplotlib plots for study results, in the pymcdm visual style.
 
 Wherever a ``pymcdm.visuals`` function fits, it is called directly
-(``ranking_flows``, ``correlation_heatmap``, ``comet_2d_esp_plot``), so the
-output is native pymcdm. The remaining plots have no pymcdm equivalent
-(grouped bars with confidence intervals; violins over unequal-size groups)
-and follow the same conventions by hand: default matplotlib colour cycle,
-black-edged bars, dashed recessive grid, legends above the axes. Each
-function returns the matplotlib Axes it drew on.
+(``ranking_flows``, ``correlation_heatmap``), so the output is native
+pymcdm. The remaining plots have no pymcdm equivalent (grouped bars with
+confidence intervals; violins over unequal-size groups; a decision surface
+for any scoring model) and follow the same conventions by hand: default
+matplotlib colour cycle, black-edged bars, dashed recessive grid, legends
+above the axes. Each function returns the matplotlib Axes it drew on.
+
+Plots only see the study result and its adapter (scores, bounds, names,
+ESPs, grid lines); they never inspect the underlying model.
 """
 
 from __future__ import annotations
@@ -17,9 +20,6 @@ import textwrap
 import numpy as np
 from matplotlib import pyplot as plt
 from pymcdm import visuals as pymcdm_visuals
-from pymcdm.methods import COMET
-
-from .adapters import META_ATTR
 
 _GRID = {"alpha": 0.5, "linestyle": "--"}
 
@@ -187,29 +187,18 @@ def plot_validation(result, ax=None):
     return ax
 
 
-def _model_esps(result):
-    """Best-effort recovery of the ESPs attached to the studied model."""
-    meta = getattr(result.adapter.model, META_ATTR, None)
-    if meta is not None and meta.esps is not None:
-        return np.atleast_2d(meta.esps)
-    esp = getattr(result.adapter.model, "esp", None)  # SPOTIS stores it natively
-    if esp is not None:
-        return np.atleast_2d(esp)
-    return None
-
-
 def plot_surface(
     result, criteria=None, at=None, esps=None, num=100, ax=None, cmap="Greens", levels=14
 ):
     """Decision surface over two criteria with the evaluation grid and ESPs.
 
-    Reproduces the surface plots of Sałabun et al. (ISD 2025), Figs. 1-2.
-    For models with more than two criteria the surface is a 2-D *slice*: the
-    remaining criteria are fixed at ``at`` (default: the study's reference
-    point, or the middle of the bounds).
-
-    For a two-criteria COMET model the plot is delegated directly to
-    :func:`pymcdm.visuals.comet_2d_esp_plot` (the exact article figure).
+    Same layout as the surface plots of Sałabun et al. (ISD 2025), Figs. 1-2
+    (``pymcdm.visuals.comet_2d_esp_plot``), drawn here for any scoring model
+    instead of only COMET. For models
+    with more than two criteria the surface is a 2-D *slice*: the remaining
+    criteria are fixed at ``at`` (default: the study's reference point, or
+    the middle of the bounds). The adapter's grid lines (characteristic
+    values for COMET) are dotted and its ESPs are starred.
 
     Parameters
     ----------
@@ -221,7 +210,8 @@ def plot_surface(
         Values at which the remaining criteria are fixed (full-length vector;
         the two plotted entries are ignored).
     esps : ndarray, optional
-        ESP points to mark; recovered from the model when omitted.
+        ESP points to mark; defaults to the adapter's ESPs (from the builder,
+        the model or ``SobolStudy(esps=...)``).
     num : int
         Grid resolution per axis.
 
@@ -250,19 +240,7 @@ def plot_surface(
     at = np.asarray(at, dtype=float).ravel()
 
     if esps is None:
-        esps = _model_esps(result)
-
-    if m == 2 and idx == (0, 1) and isinstance(adapter.model, COMET) and esps is not None:
-        # True 2-D COMET: the native pymcdm article figure, no slicing needed.
-        if ax is None:
-            _, ax = plt.subplots(figsize=(5.2, 4.4))
-        ax, _cax = pymcdm_visuals.comet_2d_esp_plot(
-            adapter.model, np.atleast_2d(esps), adapter.bounds, ax=ax
-        )
-        ax.set_xlabel(names[0])
-        ax.set_ylabel(names[1])
-        ax.figure.tight_layout()
-        return ax
+        esps = adapter.esps
 
     if ax is None:
         _, ax = plt.subplots(figsize=(5.2, 4.4))
@@ -281,14 +259,14 @@ def plot_surface(
         cf, ax=ax, label="Preference" if adapter.higher_is_closer else "Distance to ESP"
     )
 
-    # Evaluation grid: characteristic values for COMET, dotted like pymcdm.
-    cvalues = getattr(adapter.model, "cvalues", None)
-    if cvalues is not None:
-        for v in cvalues[ci]:
+    # Evaluation grid (characteristic values for COMET), dotted like pymcdm.
+    grid = adapter.grid_lines()
+    if grid is not None:
+        for v in grid[ci]:
             ax.axvline(v, color="black", linewidth=0.7, linestyle=":", alpha=0.6)
-        for v in cvalues[cj]:
+        for v in grid[cj]:
             ax.axhline(v, color="black", linewidth=0.7, linestyle=":", alpha=0.6)
-        co_x, co_y = np.meshgrid(cvalues[ci], cvalues[cj])
+        co_x, co_y = np.meshgrid(grid[ci], grid[cj])
         ax.scatter(co_x, co_y, c="black", s=14, zorder=3)
 
     if esps is not None:
