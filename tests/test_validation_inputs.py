@@ -234,7 +234,14 @@ def test_sobol_study_warns_once_for_non_power_of_two():
             second_order=False,
         ).run()
 
-    assert len(caught) == 1
+    # Count only the gcisens warning: old SALib/pandas combinations add
+    # unrelated FutureWarnings inside the same block.
+    ours = [
+        w
+        for w in caught
+        if issubclass(w.category, UserWarning) and "n_samples=30" in str(w.message)
+    ]
+    assert len(ours) == 1
 
 
 def test_sobol_study_rejects_unknown_sampler_at_construction():

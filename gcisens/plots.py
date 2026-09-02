@@ -110,8 +110,8 @@ def plot_s2_heatmap(result, ax=None, cmap="Greens"):
     """Heatmap of pairwise interaction indices (S2).
 
     Drawn directly with :func:`pymcdm.visuals.correlation_heatmap` on the
-    symmetric S2 matrix; the diagonal (undefined) is blanked and significant
-    interactions (``|S2| > 2 * conf`` and ``|S2| > 0.01``) are starred.
+    symmetric S2 matrix; the diagonal (undefined) is blanked and interactions
+    that meet the study's S2 significance thresholds are starred.
     """
     s = result.sobol
     if s.S2 is None:
@@ -144,7 +144,7 @@ def plot_s2_heatmap(result, ax=None, cmap="Greens"):
         else:
             conf = s.S2_conf[min(i, j), max(i, j)]
             val = values[i, j]
-            if abs(val) > 2 * conf and abs(val) > 0.01:
+            if result.thresholds.is_s2_significant(val, conf):
                 text.set_text(text.get_text() + "*")
 
     ax.set_title("Pairwise interactions ($S2$); * = significant", fontsize=10)

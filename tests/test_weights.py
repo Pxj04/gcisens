@@ -1,7 +1,9 @@
 import numpy as np
+import pytest
 
 from gcisens.weights import (
     characteristic_objects_grid,
+    comet_global_weights,
     regression_weights,
     sweep_local_weights,
 )
@@ -33,6 +35,23 @@ def test_characteristic_objects_grid_shape():
     assert {tuple(row) for row in grid} == {(0, 0), (0, 5), (1, 0), (1, 5), (2, 0), (2, 5)}
 
 
+def test_comet_global_weights_warns_about_large_mej():
+    class LargeGridModel:
+        def __init__(self):
+            self.cvalues = [np.arange(201), np.arange(100)]
+
+        def __call__(self, X):
+            return X[:, 0] + X[:, 1]
+
+    bounds = np.array([[0.0, 200.0], [0.0, 99.0]])
+
+    with pytest.warns(
+        UserWarning,
+        match=r"20,100 characteristic objects.*770\.6 MiB",
+    ):
+        comet_global_weights(LargeGridModel(), bounds)
+
+
 def test_sweep_local_weights_linear(linear_model):
     score, bounds = linear_model
     local = sweep_local_weights(score, [5.0, 5.0], bounds)
@@ -45,4 +64,33 @@ def test_sweep_local_weights_flat_model():
 
     bounds = np.array([[0.0, 1.0], [0.0, 1.0]])
     local = sweep_local_weights(flat, [0.5, 0.5], bounds)
+    np.testing.assert_allclose(local, [0.5, 0.5])
+
+
+def test_sweep_local_weights_excludes_upper_bound_by_default():
+    def nonlinear(X):
+        return X[:, 0] ** 8 + X[:, 1]
+
+    bounds = np.array([[0.0, 1.0], [0.0, 1.0]])
+
+    local = sweep_local_weights(nonlinear, [0.5, 0.5], bounds, percent_step=0.01)
+
+    expected_ranges = np.array([0.99**8, 0.99])
+    np.testing.assert_allclose(local, expected_ranges / expected_ranges.sum())
+
+
+def test_sweep_local_weights_can_include_upper_bound():
+    def nonlinear(X):
+        return X[:, 0] ** 8 + X[:, 1]
+
+    bounds = np.array([[0.0, 1.0], [0.0, 1.0]])
+
+    local = sweep_local_weights(
+        nonlinear,
+        [0.5, 0.5],
+        bounds,
+        percent_step=0.01,
+        include_upper=True,
+    )
+
     np.testing.assert_allclose(local, [0.5, 0.5])

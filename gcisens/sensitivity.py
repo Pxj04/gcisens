@@ -17,6 +17,7 @@ from SALib.sample import saltelli as saltelli_sample
 from SALib.sample import sobol as sobol_sample
 
 from .adapters import validate_bounds
+from .diagnosis import DiagnosisThresholds
 
 SAMPLERS = ("saltelli", "sobol")
 NON_POWER_OF_TWO_WARNING = (
@@ -47,7 +48,11 @@ def validate_sampler(sampler: str) -> str:
 
 @dataclass
 class SobolIndices:
-    """Sobol' sensitivity indices of a model over its criteria space."""
+    """Sobol' sensitivity indices of a model over its criteria space.
+
+    ``S1_conf``, ``ST_conf`` and ``S2_conf`` are bootstrap confidence-interval
+    half-widths at :attr:`conf_level`, calculated from :attr:`num_resamples`.
+    """
 
     S1: np.ndarray
     ST: np.ndarray
@@ -61,16 +66,19 @@ class SobolIndices:
     sampler: str
     output_mean: float = field(default=float("nan"))
     output_std: float = field(default=float("nan"))
+    num_resamples: int = 100
+    conf_level: float = 0.95
 
     @property
     def interaction(self) -> np.ndarray:
         """Interaction share per criterion: ``ST - S1``."""
         return self.ST - self.S1
 
-    def s2_pairs(self) -> pd.DataFrame:
+    def s2_pairs(self, thresholds: DiagnosisThresholds | None = None) -> pd.DataFrame:
         """Pairwise interactions sorted by absolute ``S2``, with significance."""
         if self.S2 is None:
             raise ValueError("Second-order indices were not computed (second_order=False)")
+        t = thresholds or DiagnosisThresholds()
         rows = []
         names = self.criteria_names
         for i in range(len(names)):
@@ -82,7 +90,7 @@ class SobolIndices:
                         "criterion_j": names[j],
                         "S2": s2,
                         "S2_conf": conf,
-                        "significant": bool(abs(s2) > 2 * conf and abs(s2) > 0.01),
+                        "significant": t.is_s2_significant(s2, conf),
                     }
                 )
         df = pd.DataFrame(rows)
@@ -97,6 +105,8 @@ def sobol_analysis(
     second_order: bool = True,
     seed: int | None = None,
     sampler: str = "saltelli",
+    num_resamples: int = 100,
+    conf_level: float = 0.95,
 ) -> SobolIndices:
     """Run the full sampling -> evaluation -> analysis pipeline.
 
@@ -120,6 +130,11 @@ def sobol_analysis(
     sampler : {"saltelli", "sobol"}
         ``"saltelli"`` reproduces the sampling used in the source articles;
         ``"sobol"`` is SALib's current recommended (scrambled) sampler.
+    num_resamples : int
+        Number of bootstrap resamples used for confidence intervals.
+    conf_level : float
+        Confidence level for ``S1_conf``, ``ST_conf`` and ``S2_conf``. These
+        values are interval half-widths, not standard errors.
     """
     sampler = validate_sampler(sampler)
     n_samples = validate_n_samples(n_samples)
@@ -148,7 +163,13 @@ def sobol_analysis(
         raise ValueError(f"score_fn returned {Y.shape[0]} values for {X.shape[0]} samples")
 
     Si = sobol_analyze.analyze(
-        problem, Y, calc_second_order=second_order, print_to_console=False, seed=seed
+        problem,
+        Y,
+        calc_second_order=second_order,
+        num_resamples=num_resamples,
+        conf_level=conf_level,
+        print_to_console=False,
+        seed=seed,
     )
 
     return SobolIndices(
@@ -162,6 +183,8 @@ def sobol_analysis(
         n_samples=n_samples,
         n_evaluations=X.shape[0],
         sampler=sampler,
+        num_resamples=num_resamples,
+        conf_level=conf_level,
         output_mean=float(Y.mean()),
         output_std=float(Y.std()),
     )

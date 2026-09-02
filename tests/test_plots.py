@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from gcisens import SobolStudy, esp_comet, esp_spotis
+from gcisens import DiagnosisThresholds, SobolStudy, esp_comet, esp_spotis
 
 
 @pytest.fixture(scope="module")
@@ -37,6 +37,24 @@ def test_plot_rankings(comet_result):
 def test_plot_s2_heatmap(comet_result):
     ax = comet_result.plot_s2_heatmap()
     assert ax.get_images()
+
+
+def test_plot_s2_heatmap_uses_diagnosis_thresholds(linear_model):
+    score, bounds = linear_model
+    result = SobolStudy(
+        score,
+        bounds=bounds,
+        weights=np.array([0.7, 0.3]),
+        thresholds=DiagnosisThresholds(s2_significance_factor=0.5),
+        n_samples=64,
+        seed=0,
+    ).run()
+    result.sobol.S2[0, 1] = 0.03
+    result.sobol.S2_conf[0, 1] = 0.02
+
+    ax = result.plot_s2_heatmap()
+
+    assert any(text.get_text().endswith("*") for text in ax.texts)
 
 
 def test_plot_validation(comet_result):

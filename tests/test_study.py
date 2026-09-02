@@ -6,6 +6,7 @@ import pytest
 
 import gcisens
 from gcisens import COMET, SPOTIS, ESPExpert, SobolStudy, compare, esp_comet, esp_spotis
+from gcisens.adapters import CometAdapter
 
 
 def test_builder_equals_manual_pymcdm_construction(hr_setup):
@@ -36,6 +37,19 @@ def test_comet_bounds_recovered_from_cvalues(hr_setup):
     np.testing.assert_allclose(result.adapter.bounds, bounds)
 
 
+def test_comet_adapter_weights_fit_has_no_call_order_dependency(hr_setup):
+    criteria, bounds, esp1, _ = hr_setup
+    model = esp_comet(esps=esp1, bounds=bounds, criteria_names=criteria)
+    adapter = CometAdapter(model)
+
+    r2 = adapter.declared_weights_r2()
+    fit = adapter.weights_fit
+
+    assert r2 == fit.r2
+    assert adapter.weights_fit is fit
+    np.testing.assert_allclose(adapter.declared_weights(), fit.weights)
+
+
 def test_spotis_study_uses_declared_weights(hr_setup):
     criteria, bounds, esp1, _ = hr_setup
     w = np.array([0.3, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1])
@@ -64,6 +78,43 @@ def test_callable_model_fallback(linear_model):
     assert result.r2 > 0.99
 
 
+def test_study_reports_bootstrap_configuration(linear_model):
+    score, bounds = linear_model
+
+    result = SobolStudy(
+        score,
+        bounds=bounds,
+        weights=np.array([0.7, 0.3]),
+        n_samples=64,
+        num_resamples=25,
+        conf_level=0.9,
+        seed=0,
+    ).run()
+
+    assert result.sobol.num_resamples == 25
+    assert result.sobol.conf_level == 0.9
+    assert result.summary()["num_resamples"] == 25
+    assert result.summary()["conf_level"] == 0.9
+
+
+def test_study_s2_table_uses_diagnosis_thresholds(linear_model):
+    score, bounds = linear_model
+    thresholds = gcisens.DiagnosisThresholds(s2_significance_factor=2.0)
+    result = SobolStudy(
+        score,
+        bounds=bounds,
+        weights=np.array([0.7, 0.3]),
+        thresholds=thresholds,
+        n_samples=64,
+        seed=0,
+    ).run()
+    result.sobol.S2[0, 1] = 0.03
+    result.sobol.S2_conf[0, 1] = 0.02
+
+    assert result.sobol.s2_pairs().loc[0, "significant"]
+    assert not result.s2_table().loc[0, "significant"]
+
+
 def test_callable_without_bounds_raises(linear_model):
     score, _ = linear_model
     with pytest.raises(ValueError, match="bounds"):
@@ -90,6 +141,29 @@ def test_compare_table(linear_model):
     table = cmp.table()
     assert list(table.columns) == ["a", "b"]
     assert "R2" in table.index
+    assert "rho_S1_ST" in table.index
+    assert "rho_w_wloc" in table.index
+    assert table.loc["rho_w_wloc"].isna().all()
+
+    latex = cmp.to_latex()
+    assert r"$\rho(S1, ST)$" in latex
+    assert r"$\rho(w, w_{\mathrm{loc}})$" in latex
+
+
+def test_constant_view_correlation_is_explained_as_not_available(tmp_path, linear_model):
+    score, bounds = linear_model
+    result = SobolStudy(
+        score,
+        bounds=bounds,
+        weights=np.array([0.5, 0.5]),
+        n_samples=64,
+        seed=0,
+    ).run()
+
+    assert np.isnan(result.summary()["rho_w_S1"])
+    assert "n/a" in gcisens.comparison_to_latex(compare({"equal weights": result}))
+    report = result.to_html(tmp_path / "report.html", include_plots=False)
+    assert "<td>n/a</td>" in report.read_text()
 
 
 def test_exports_roundtrip(tmp_path, linear_model):

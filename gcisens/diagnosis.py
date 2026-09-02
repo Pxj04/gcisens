@@ -59,6 +59,16 @@ class DiagnosisThresholds:
     #: ... or ``w < negligible_weight`` while ``ST >= influential_st``.
     negligible_weight: float = 0.01
     influential_st: float = 0.02
+    #: pairwise significance: ``abs(S2) > s2_significance_factor * S2_conf`` ...
+    s2_significance_factor: float = 1.0
+    #: ... and ``abs(S2) > s2_min_abs``.
+    s2_min_abs: float = 0.01
+
+    def is_s2_significant(self, value: float, conf: float) -> bool:
+        """Return whether an S2 estimate clears both significance thresholds."""
+        return bool(
+            abs(value) > self.s2_significance_factor * conf and abs(value) > self.s2_min_abs
+        )
 
 
 @dataclass
