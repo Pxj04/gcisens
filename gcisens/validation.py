@@ -3,6 +3,7 @@
 Reproduces the validation of Śniegowski et al. (KES 2026), Table 1: score
 separation between label groups and lift@k of the top-scored alternatives.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

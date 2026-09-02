@@ -13,8 +13,9 @@ NAMES = ["C1", "C2", "C3", "C4"]
 
 
 def categories(w, s1, st, thresholds=None):
-    return [d.category for d in classify(NAMES, np.array(w), np.array(s1),
-                                         np.array(st), thresholds)]
+    return [
+        d.category for d in classify(NAMES, np.array(w), np.array(s1), np.array(st), thresholds)
+    ]
 
 
 def test_confirmed_transparency():

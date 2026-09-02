@@ -77,6 +77,12 @@ You can install `gcisens` from PyPI using pip:
 pip install gcisens
 ```
 
+### Reproducibility
+
+`gcisens` requires NumPy 2.3 or newer. NumPy 2.3 reproduces the published
+multi-ESP article results, which depend on exact floating-point tie detection
+in pymcdm 1.4.
+
 ## Quick start
 
 The example below builds an ESP-COMET model with three criteria and one expected

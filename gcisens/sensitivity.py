@@ -4,6 +4,7 @@ Thin wrapper around SALib: Saltelli / Sobol' sampling over the criteria
 bounds, model evaluation, and index estimation with bootstrap confidence
 intervals — Algorithm 1 of Sałabun et al. (ISD 2025).
 """
+
 from __future__ import annotations
 
 import warnings
@@ -59,9 +60,7 @@ class SobolIndices:
                     }
                 )
         df = pd.DataFrame(rows)
-        return df.reindex(df["S2"].abs().sort_values(ascending=False).index).reset_index(
-            drop=True
-        )
+        return df.reindex(df["S2"].abs().sort_values(ascending=False).index).reset_index(drop=True)
 
 
 def sobol_analysis(
@@ -110,15 +109,11 @@ def sobol_analysis(
             warnings.simplefilter("ignore", DeprecationWarning)
             X = saltelli_sample.sample(problem, n_samples, calc_second_order=second_order)
     else:
-        X = sobol_sample.sample(
-            problem, n_samples, calc_second_order=second_order, seed=seed
-        )
+        X = sobol_sample.sample(problem, n_samples, calc_second_order=second_order, seed=seed)
 
     Y = np.asarray(score_fn(X), dtype=float).ravel()
     if Y.shape[0] != X.shape[0]:
-        raise ValueError(
-            f"score_fn returned {Y.shape[0]} values for {X.shape[0]} samples"
-        )
+        raise ValueError(f"score_fn returned {Y.shape[0]} values for {X.shape[0]} samples")
 
     Si = sobol_analyze.analyze(
         problem, Y, calc_second_order=second_order, print_to_console=False, seed=seed

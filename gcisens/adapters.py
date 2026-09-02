@@ -4,6 +4,7 @@ The rest of the pipeline (Sobol' analysis, weights, diagnosis, exports) only
 talks to :class:`ModelAdapter`. Adding support for another MCDA method means
 writing one new adapter here and nothing else.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -58,9 +59,7 @@ class ModelAdapter:
         if criteria_names is None:
             criteria_names = [f"C{i + 1}" for i in range(m)]
         if len(criteria_names) != m:
-            raise ValueError(
-                f"Got {len(criteria_names)} criteria names for {m} criteria"
-            )
+            raise ValueError(f"Got {len(criteria_names)} criteria names for {m} criteria")
         self.criteria_names = [str(c) for c in criteria_names]
 
     @property
@@ -141,9 +140,7 @@ class SpotisAdapter(ModelAdapter):
             raise ValueError("weights must be a 1-D array with one value per criterion")
         if types is None:
             if model.esp is None:
-                raise ValueError(
-                    "SPOTIS without an ESP needs criteria types (1 profit / -1 cost)."
-                )
+                raise ValueError("SPOTIS without an ESP needs criteria types (1 profit / -1 cost).")
             types = np.ones(self.n_criteria)
         self.types = np.asarray(types, dtype=float)
 

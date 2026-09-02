@@ -12,8 +12,7 @@ from gcisens import SobolStudy, esp_comet, esp_spotis
 @pytest.fixture(scope="module")
 def comet_result(request):
     bounds = np.array([[0.0, 10.0], [0.0, 5.0], [0.0, 1.0]])
-    model = esp_comet(esps=[[7, 2, 0.5]], bounds=bounds,
-                      criteria_names=["A", "B", "C"])
+    model = esp_comet(esps=[[7, 2, 0.5]], bounds=bounds, criteria_names=["A", "B", "C"])
     result = SobolStudy(model, n_samples=64, seed=0).run(reference_point=[5, 2.5, 0.5])
     rng = np.random.default_rng(0)
     X = rng.uniform(bounds[:, 0], bounds[:, 1], size=(100, 3))
@@ -59,8 +58,7 @@ def test_plot_surface_by_name(comet_result):
 
 def test_plot_surface_two_criteria_model():
     bounds = np.array([[0.0, 1.0], [0.0, 1.0]])
-    model = esp_comet(esps=[[0.4, 0.4], [0.8, 0.2]], bounds=bounds,
-                      criteria_names=["C1", "C2"])
+    model = esp_comet(esps=[[0.4, 0.4], [0.8, 0.2]], bounds=bounds, criteria_names=["C1", "C2"])
     result = SobolStudy(model, n_samples=32, seed=0).run()
     ax = result.plot_surface()
     assert ax.get_title() == ""  # no slice note for a true 2-D model
@@ -68,8 +66,9 @@ def test_plot_surface_two_criteria_model():
 
 def test_plot_surface_spotis():
     bounds = np.array([[0.0, 10.0], [0.0, 5.0], [0.0, 2.0]])
-    model = esp_spotis(esp=[7, 2, 1], bounds=bounds,
-                       weights=[0.5, 0.3, 0.2], criteria_names=["A", "B", "C"])
+    model = esp_spotis(
+        esp=[7, 2, 1], bounds=bounds, weights=[0.5, 0.3, 0.2], criteria_names=["A", "B", "C"]
+    )
     result = SobolStudy(model, n_samples=32, seed=0).run()
     ax = result.plot_surface(criteria=(0, 1))
     # ESP recovered from the SPOTIS model itself and marked on the plot.

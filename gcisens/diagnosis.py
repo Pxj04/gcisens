@@ -14,6 +14,7 @@ The thresholds are the article's defaults for preference scores normalised to
 [0, 1]; the article explicitly frames them as context-dependent, so they are a
 parameter (:class:`DiagnosisThresholds`), not constants.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -111,10 +112,7 @@ def classify(
             )
         elif st > 0 and gap / st >= t.interaction_ratio and gap >= t.interaction_abs:
             category = INTERACTION_DOMINANCE
-            detail = (
-                f"interactions carry {gap / st:.0%} of the total effect "
-                f"(ST-S1={gap:.4f})"
-            )
+            detail = f"interactions carry {gap / st:.0%} of the total effect (ST-S1={gap:.4f})"
         elif displacement >= t.rank_displacement or (
             w < t.negligible_weight and st >= t.influential_st
         ):

@@ -33,8 +33,7 @@ def test_second_order_disabled():
         return np.atleast_2d(X)[:, 0]
 
     bounds = np.array([[0.0, 1.0], [0.0, 1.0]])
-    res = sobol_analysis(score, bounds, ["A", "B"], n_samples=256,
-                         second_order=False, seed=0)
+    res = sobol_analysis(score, bounds, ["A", "B"], n_samples=256, second_order=False, seed=0)
     assert res.S2 is None
     assert res.n_evaluations == 256 * (2 + 2)
     with pytest.raises(ValueError, match="Second-order"):
@@ -43,8 +42,7 @@ def test_second_order_disabled():
 
 def test_sobol_sampler_variant(linear_model):
     score, bounds = linear_model
-    res = sobol_analysis(score, bounds, ["A", "B"], n_samples=512,
-                         sampler="sobol", seed=7)
+    res = sobol_analysis(score, bounds, ["A", "B"], n_samples=512, sampler="sobol", seed=7)
     expected = np.array([0.49, 0.09]) / 0.58
     np.testing.assert_allclose(res.S1, expected, atol=0.05)
 

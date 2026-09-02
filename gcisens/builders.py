@@ -4,6 +4,7 @@ These return plain pymcdm objects (fully usable with the pymcdm ecosystem,
 e.g. ``pymcdm.visuals``) with gcisens metadata attached, so that
 :class:`gcisens.SobolStudy` does not need bounds or names repeated.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -112,7 +113,12 @@ def esp_spotis(
     setattr(
         model,
         META_ATTR,
-        ModelMeta(bounds=bounds, criteria_names=criteria_names, weights=weights,
-                  types=types, esps=np.atleast_2d(esp)),
+        ModelMeta(
+            bounds=bounds,
+            criteria_names=criteria_names,
+            weights=weights,
+            types=types,
+            esps=np.atleast_2d(esp),
+        ),
     )
     return model

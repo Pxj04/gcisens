@@ -8,6 +8,7 @@ and follow the same conventions by hand: default matplotlib colour cycle,
 black-edged bars, dashed recessive grid, legends above the axes. Each
 function returns the matplotlib Axes it drew on.
 """
+
 from __future__ import annotations
 
 import re
@@ -33,19 +34,49 @@ def plot_indices(result, ax=None):
     width = 0.26
     err = {"ecolor": "#333333", "elinewidth": 1, "capsize": 2}
 
-    ax.bar(x - width, result.weights, width * 0.92, label="$w$",
-           color="C0", edgecolor="black", linewidth=1)
-    ax.bar(x, s.S1, width * 0.92, label="$S1$", yerr=s.S1_conf,
-           color="C1", edgecolor="black", linewidth=1, error_kw=err)
-    ax.bar(x + width, s.ST, width * 0.92, label="$ST$", yerr=s.ST_conf,
-           color="C2", edgecolor="black", linewidth=1, error_kw=err)
+    ax.bar(
+        x - width,
+        result.weights,
+        width * 0.92,
+        label="$w$",
+        color="C0",
+        edgecolor="black",
+        linewidth=1,
+    )
+    ax.bar(
+        x,
+        s.S1,
+        width * 0.92,
+        label="$S1$",
+        yerr=s.S1_conf,
+        color="C1",
+        edgecolor="black",
+        linewidth=1,
+        error_kw=err,
+    )
+    ax.bar(
+        x + width,
+        s.ST,
+        width * 0.92,
+        label="$ST$",
+        yerr=s.ST_conf,
+        color="C2",
+        edgecolor="black",
+        linewidth=1,
+        error_kw=err,
+    )
 
     ax.set_xticks(x, names, rotation=20, ha="right")
     ax.set_ylabel("Importance / variance share")
     ax.grid(**_GRID)
     ax.set_axisbelow(True)
-    ax.legend(bbox_to_anchor=(0.0, 1.02, 1.0, 0.102), loc="lower left",
-              ncol=3, mode="expand", borderaxespad=0.0)
+    ax.legend(
+        bbox_to_anchor=(0.0, 1.02, 1.0, 0.102),
+        loc="lower left",
+        ncol=3,
+        mode="expand",
+        borderaxespad=0.0,
+    )
     ax.figure.tight_layout()
     return ax
 
@@ -97,8 +128,12 @@ def plot_s2_heatmap(result, ax=None, cmap="Greens"):
             values[i, j] = values[j, i] = s.S2[i, j]
 
     ax = pymcdm_visuals.correlation_heatmap(
-        values, labels=names, float_fmt="%0.3f", cmap=cmap,
-        text_kwargs={"fontsize": 7.5}, ax=ax,
+        values,
+        labels=names,
+        float_fmt="%0.3f",
+        cmap=cmap,
+        text_kwargs={"fontsize": 7.5},
+        ax=ax,
     )
 
     # Post-process the cell texts: blank the diagonal, star significance.
@@ -126,8 +161,7 @@ def plot_validation(result, ax=None):
     val = result.validation
     pos, neg = val.scores[val.labels], val.scores[~val.labels]
 
-    parts = ax.violinplot([neg, pos], positions=[0, 1], showmedians=True,
-                          showextrema=False)
+    parts = ax.violinplot([neg, pos], positions=[0, 1], showmedians=True, showextrema=False)
     for body, color in zip(parts["bodies"], ("C0", "C1")):
         body.set_facecolor(color)
         body.set_alpha(0.6)
@@ -135,10 +169,17 @@ def plot_validation(result, ax=None):
     parts["cmedians"].set_color("black")
 
     ax.set_xticks([0, 1], [f"negative (n={len(neg)})", f"positive (n={len(pos)})"])
-    ax.annotate(f"$\\Delta$ mean = {val.delta_mean:+.4f}",
-                xy=(0.98, 0.02), xycoords="axes fraction", ha="right", fontsize=9)
-    ax.set_title("   ".join(f"lift@{int(r.k)}={r.lift:.2f}$\\times$"
-                            for r in val.lift.itertuples()), fontsize=10)
+    ax.annotate(
+        f"$\\Delta$ mean = {val.delta_mean:+.4f}",
+        xy=(0.98, 0.02),
+        xycoords="axes fraction",
+        ha="right",
+        fontsize=9,
+    )
+    ax.set_title(
+        "   ".join(f"lift@{int(r.k)}={r.lift:.2f}$\\times$" for r in val.lift.itertuples()),
+        fontsize=10,
+    )
     ax.set_ylabel("Model score")
     ax.grid(**_GRID)
     ax.set_axisbelow(True)
@@ -157,8 +198,9 @@ def _model_esps(result):
     return None
 
 
-def plot_surface(result, criteria=None, at=None, esps=None, num=100, ax=None,
-                 cmap="Greens", levels=14):
+def plot_surface(
+    result, criteria=None, at=None, esps=None, num=100, ax=None, cmap="Greens", levels=14
+):
     """Decision surface over two criteria with the evaluation grid and ESPs.
 
     Reproduces the surface plots of Sałabun et al. (ISD 2025), Figs. 1-2.
@@ -200,8 +242,11 @@ def plot_surface(result, criteria=None, at=None, esps=None, num=100, ax=None,
     ci, cj = idx
 
     if at is None:
-        at = (result.reference_point if result.reference_point is not None
-              else adapter.bounds.mean(axis=1))
+        at = (
+            result.reference_point
+            if result.reference_point is not None
+            else adapter.bounds.mean(axis=1)
+        )
     at = np.asarray(at, dtype=float).ravel()
 
     if esps is None:
@@ -232,8 +277,9 @@ def plot_surface(result, criteria=None, at=None, esps=None, num=100, ax=None,
     z = adapter.scores(points).reshape(num, num)
 
     cf = ax.contourf(gx, gy, z, levels=levels, cmap=cmap)
-    ax.figure.colorbar(cf, ax=ax, label="Preference" if adapter.higher_is_closer
-                       else "Distance to ESP")
+    ax.figure.colorbar(
+        cf, ax=ax, label="Preference" if adapter.higher_is_closer else "Distance to ESP"
+    )
 
     # Evaluation grid: characteristic values for COMET, dotted like pymcdm.
     cvalues = getattr(adapter.model, "cvalues", None)
@@ -247,11 +293,25 @@ def plot_surface(result, criteria=None, at=None, esps=None, num=100, ax=None,
 
     if esps is not None:
         esps = np.atleast_2d(esps)
-        ax.scatter(esps[:, ci], esps[:, cj], c="orange", marker="*", s=140,
-                   zorder=4, edgecolors="black", linewidths=0.5)
+        ax.scatter(
+            esps[:, ci],
+            esps[:, cj],
+            c="orange",
+            marker="*",
+            s=140,
+            zorder=4,
+            edgecolors="black",
+            linewidths=0.5,
+        )
         for k, esp in enumerate(esps, 1):
-            ax.text(esp[ci] + (xhi - xlo) * 0.03, esp[cj], f"$ESP_{{{k}}}$",
-                    color="orange", fontweight="bold", fontsize=11)
+            ax.text(
+                esp[ci] + (xhi - xlo) * 0.03,
+                esp[cj],
+                f"$ESP_{{{k}}}$",
+                color="orange",
+                fontweight="bold",
+                fontsize=11,
+            )
 
     ax.set_xlabel(names[ci])
     ax.set_ylabel(names[cj])
@@ -261,7 +321,6 @@ def plot_surface(result, criteria=None, at=None, esps=None, num=100, ax=None,
     ax.set_yticks(np.linspace(ylo, yhi, 5))
     if m > 2:
         fixed = ", ".join(f"{names[k]}={at[k]:g}" for k in range(m) if k not in idx)
-        ax.set_title("\n".join(textwrap.wrap(f"Slice at {fixed}", width=58)),
-                     fontsize=8)
+        ax.set_title("\n".join(textwrap.wrap(f"Slice at {fixed}", width=58)), fontsize=8)
     ax.figure.tight_layout()
     return ax
