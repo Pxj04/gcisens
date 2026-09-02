@@ -62,4 +62,4 @@ jobs:
       - name: Install
         run: pip install -e ".[docs]"
       - name: Build documentation
-        run: sphinx -b html -W docs _build/html
+        run: python -m sphinx -b html -W docs _build/html
