@@ -12,13 +12,6 @@ from pathlib import Path
 
 import numpy as np
 
-_CATEGORY_COLORS = {
-    "hidden influence": "#e37e7e",
-    "interaction dominance": "#e3b57e",
-    "moderate discrepancy": "#e3d97e",
-    "confirmed transparency": "#a8d8a8",
-}
-
 
 # --------------------------------------------------------------------- helpers
 def _fmt(x, digits: int = 4) -> str:
@@ -179,17 +172,7 @@ def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
     caption = _latex_caption(caption, "Comparative summary across configurations.")
     label = label or "tab:comparison"
     df = comparison.table()
-    pretty = {
-        "r2_fit": r"$R^2$ (fit)",
-        "r2_samples": r"$R^2$ (uniform sample)",
-        "sum_S1": r"$\sum S1$",
-        "sum_ST": r"$\sum ST$",
-        "sum_interaction": r"$\sum (ST - S1)$",
-        "rho_w_S1": r"$\rho(w, S1)$",
-        "rho_w_ST": r"$\rho(w, ST)$",
-        "rho_S1_ST": r"$\rho(S1, ST)$",
-        "rho_w_wloc": r"$\rho(w, w_{\mathrm{loc}})$",
-    }
+    labels = comparison.labels()
     cols = "|l|" + "c|" * len(df.columns)
     lines = [
         r"\begin{table}[h]",
@@ -204,9 +187,7 @@ def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
         r"\hline",
     ]
     for metric in df.index:
-        row = [pretty[metric] if metric in pretty else _latex_escape(metric)] + [
-            _fmt(v) for v in df.loc[metric]
-        ]
+        row = [labels.get(metric) or _latex_escape(metric)] + [_fmt(v) for v in df.loc[metric]]
         lines.append(" & ".join(row) + r" \\")
     lines += [r"\hline", r"\end{tabular}", r"\end{table}"]
     text = "\n".join(lines)
@@ -278,17 +259,15 @@ def to_html(
     parts.append(_df_to_html(result.table()))
 
     parts.append("<h2>Discrepancy diagnosis</h2>")
-    diag = result.diagnosis()
     parts.append(
         "<table><thead><tr><th>Criterion</th><th>Category</th><th>Detail</th></tr></thead><tbody>"
     )
-    for _, row in diag.iterrows():
-        color = _CATEGORY_COLORS.get(row["Category"], "#8a8a8a")
+    for d in result.diagnoses:
         parts.append(
-            f"<tr><td>{html.escape(row['Criterion'])}</td>"
+            f"<tr><td>{html.escape(d.criterion)}</td>"
             f"<td style='text-align:left'><span class='cat' "
-            f"style='background:{color}'>{html.escape(row['Category'])}</span></td>"
-            f"<td style='text-align:left'>{html.escape(row['Detail'])}</td></tr>"
+            f"style='background:{d.category.color}'>{html.escape(d.category.label)}</span></td>"
+            f"<td style='text-align:left'>{html.escape(d.detail)}</td></tr>"
         )
     parts.append("</tbody></table>")
 
@@ -312,7 +291,8 @@ def to_html(
             if result.sobol.S2 is not None:
                 sections.append(("Interactions", plots.plot_s2_heatmap))
             sections.append(("Rankings", plots.plot_rankings))
-            sections.append(("Decision surface", plots.plot_surface))
+            if result.adapter is not None:  # the surface scores new points
+                sections.append(("Decision surface", lambda r: plots.plot_surface(r, r.adapter)))
             if result.validation is not None:
                 sections.append(("Score distributions", plots.plot_validation))
             parts.append("<h2>Plots</h2>")

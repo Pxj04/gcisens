@@ -22,10 +22,43 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-HIDDEN_INFLUENCE = "hidden influence"
-INTERACTION_DOMINANCE = "interaction dominance"
-MODERATE_DISCREPANCY = "moderate discrepancy"
-CONFIRMED_TRANSPARENCY = "confirmed transparency"
+
+class Category(str):
+    """A discrepancy category: the ``str`` used in tables and CSV files,
+    carrying its presentation (a display ``label`` and a ``color`` for HTML
+    badges) so that renderers never key on the raw name.
+
+    Compares and hashes as its name, so ``HIDDEN_INFLUENCE == "hidden
+    influence"`` holds and the constants work as dict keys and set members.
+    """
+
+    label: str
+    color: str
+
+    def __new__(cls, name: str, label: str | None = None, color: str = "#8a8a8a"):
+        obj = super().__new__(cls, name)
+        obj.label = label if label is not None else name[:1].upper() + name[1:]
+        obj.color = color
+        return obj
+
+    def __getnewargs__(self):
+        return (str(self), self.label, self.color)
+
+    @classmethod
+    def of(cls, value) -> Category:
+        """The category constant for a name; a :class:`Category` passes through."""
+        if isinstance(value, cls):
+            return value
+        for category in CATEGORIES:
+            if category == value:
+                return category
+        raise ValueError(f"unknown category {value!r}; expected one of {list(CATEGORIES)}")
+
+
+HIDDEN_INFLUENCE = Category("hidden influence", color="#e37e7e")
+INTERACTION_DOMINANCE = Category("interaction dominance", color="#e3b57e")
+MODERATE_DISCREPANCY = Category("moderate discrepancy", color="#e3d97e")
+CONFIRMED_TRANSPARENCY = Category("confirmed transparency", color="#a8d8a8")
 
 CATEGORIES = (
     HIDDEN_INFLUENCE,
@@ -73,11 +106,18 @@ class DiagnosisThresholds:
 
 @dataclass
 class CriterionDiagnosis:
-    """Diagnostic label for one criterion."""
+    """Diagnostic label for one criterion.
+
+    ``category`` may be given as a plain name; it is resolved to the
+    :class:`Category` constant (``ValueError`` for an unknown name).
+    """
 
     criterion: str
-    category: str
+    category: Category
     detail: str
+
+    def __post_init__(self):
+        self.category = Category.of(self.category)
 
 
 def rank_descending(values) -> np.ndarray:

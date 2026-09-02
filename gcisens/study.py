@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from .adapters import make_adapter
+from .adapters import ModelAdapter, make_adapter
 from .diagnosis import (
     CriterionDiagnosis,
     DiagnosisThresholds,
@@ -71,6 +71,22 @@ class View:
     def __post_init__(self):
         self.values = np.asarray(self.values, dtype=float)
         self.ranks = rank_descending(self.values)
+
+
+@dataclass(frozen=True)
+class Metric:
+    """One configuration-level metric of a study: its summary key, its
+    display label and its value.
+
+    The label is defined here, once; :meth:`Comparison.table` and the LaTeX
+    comparison writer read it from the results they render.
+    """
+
+    #: Key in :meth:`StudyResult.summary`, CSV files and comparison tables.
+    key: str
+    #: Math label for LaTeX, e.g. ``$\rho(w, S1)$``.
+    label: str
+    value: float
 
 
 class SobolStudy:
@@ -221,38 +237,27 @@ class SobolStudy:
         else:
             point = None
 
-        # 4. Views (each ranks itself) + Spearman correlations.
+        # 4. Views (each ranks itself). The record derives the Spearman
+        # correlations between them.
         views = [View("w", "$w$", weights_arr)]
         if local is not None:
             views.append(View("w_loc", r"$w_{\mathrm{loc}}$", local))
         views += [View("S1", "$S1$", sobol.S1), View("ST", "$ST$", sobol.ST)]
-        # Tie-aware Spearman on the raw values (equivalent to rank correlation,
-        # but exact ties — e.g. two zero weights — get average ranks).
-        correlations = {
-            "rho_w_S1": _spearman(weights_arr, sobol.S1),
-            "rho_w_ST": _spearman(weights_arr, sobol.ST),
-            "rho_S1_ST": _spearman(sobol.S1, sobol.ST),
-        }
-        if local is not None:
-            correlations["rho_w_wloc"] = _spearman(weights_arr, local)
 
         # 5. Discrepancy diagnosis.
         diagnoses = classify(names, weights_arr, sobol.S1, sobol.ST, self.thresholds)
 
         return StudyResult(
-            adapter=adapter,
-            weights=weights_arr,
-            weights_source=weights_source,
+            views=views,
+            sobol=sobol,
+            diagnoses=diagnoses,
             r2_fit=None if r2_fit is None else float(r2_fit),
             r2_samples=float(sample_fit.r2),
-            local_weights=local,
-            reference_point=point,
-            sobol=sobol,
-            views=views,
-            correlations=correlations,
-            diagnoses=diagnoses,
             thresholds=self.thresholds,
+            weights_source=weights_source,
+            reference_point=point,
             n_r2_samples=self.n_r2_samples,
+            adapter=adapter,
         )
 
     @staticmethod
@@ -277,38 +282,95 @@ class SobolStudy:
         return regression_weights(X, adapter.scores(X), adapter.bounds)
 
 
-@dataclass
-class StudyResult:
-    """All raw outputs of a :class:`SobolStudy` run, with reporting helpers."""
+#: Display labels of the summary metrics, defined once; :attr:`StudyResult.metrics`
+#: attaches them to the values and every renderer reads them from there.
+METRIC_LABELS = {
+    "r2_fit": r"$R^2$ (fit)",
+    "r2_samples": r"$R^2$ (uniform sample)",
+    "sum_S1": r"$\sum S1$",
+    "sum_ST": r"$\sum ST$",
+    "sum_interaction": r"$\sum (ST - S1)$",
+    "rho_w_S1": r"$\rho(w, S1)$",
+    "rho_w_ST": r"$\rho(w, ST)$",
+    "rho_S1_ST": r"$\rho(S1, ST)$",
+    "rho_w_wloc": r"$\rho(w, w_{\mathrm{loc}})$",
+}
 
-    adapter: object
-    weights: np.ndarray
-    weights_source: str
+
+@dataclass(eq=False)
+class StudyResult:
+    """The outcome of a :class:`SobolStudy` run: a plain record of the
+    numbers, with reporting helpers.
+
+    The record holds the views (``w``, optional ``w_loc``, ``S1``, ``ST``),
+    the Sobol' indices, the per-criterion diagnoses, the two R² values and,
+    once :meth:`validate` has run, the validation. Everything else
+    (:attr:`weights`, :attr:`ranks`, :attr:`correlations`, :attr:`metrics`,
+    :meth:`table`, :meth:`summary`) is derived from these fields, so a
+    record built by hand renders exactly like one produced by a study.
+
+    The model itself is not part of the numbers. :attr:`adapter` is an
+    optional handle that only :meth:`validate` and :meth:`plot_surface` need
+    (they score new points); every table, export and other plot works on a
+    record without it.
+    """
+
+    #: Ordered views: ``w``, ``w_loc`` (only with a reference point), ``S1``, ``ST``.
+    views: list[View]
+    sobol: SobolIndices
+    diagnoses: list[CriterionDiagnosis]
     #: R^2 of the fit behind the reported weights: the characteristic-object
     #: regression for COMET, the sample regression for a callable without
     #: weights, ``None`` for declared weights (SPOTIS).
-    r2_fit: float | None
+    r2_fit: float | None = None
     #: R^2 of a linear fit on one uniform sample over the bounds; computed the
     #: same way for every model, so use it to compare studies. Studies with
     #: the same ``seed`` and ``bounds`` share the sample points.
-    r2_samples: float
-    local_weights: np.ndarray | None
-    reference_point: np.ndarray | None
-    sobol: SobolIndices
-    views: list[View]
-    correlations: dict
-    diagnoses: list[CriterionDiagnosis]
-    thresholds: DiagnosisThresholds
+    r2_samples: float | None = None
+    #: Thresholds the diagnoses were made with (also used for S2 significance).
+    thresholds: DiagnosisThresholds = field(default_factory=DiagnosisThresholds)
+    #: Where the ``w`` view comes from (``declared``, ``regression (...)``).
+    weights_source: str = "declared"
+    #: Point at which the ``w_loc`` view was computed, if any.
+    reference_point: np.ndarray | None = None
     #: Size of the uniform sample behind :attr:`r2_samples`.
-    n_r2_samples: int = 4096
-    validation: ValidationResult | None = field(default=None)
+    n_r2_samples: int | None = None
+    #: Set by :meth:`validate`; ``None`` until then. Exports include the
+    #: validation section only when it is set; :meth:`plot_validation`
+    #: requires it.
+    validation: ValidationResult | None = None
+    #: The model handle. Needed only by :meth:`validate` and :meth:`plot_surface`.
+    adapter: ModelAdapter | None = None
 
+    def __post_init__(self):
+        keys = [v.key for v in self.views]
+        if "w" not in keys or "S1" not in keys or "ST" not in keys:
+            raise ValueError(f"views must include 'w', 'S1' and 'ST', got {keys}")
+        if self.reference_point is not None:
+            self.reference_point = np.asarray(self.reference_point, dtype=float).ravel()
+
+    # ------------------------------------------------------------- accessors
     @property
     def criteria_names(self) -> list[str]:
         return self.sobol.criteria_names
 
+    def view(self, key: str) -> View | None:
+        """The view with the given key (``w``, ``w_loc``, ``S1``, ``ST``) or ``None``."""
+        return next((v for v in self.views if v.key == key), None)
+
     @property
-    def r2(self) -> float:
+    def weights(self) -> np.ndarray:
+        """Values of the ``w`` view."""
+        return self.view("w").values
+
+    @property
+    def local_weights(self) -> np.ndarray | None:
+        """Values of the ``w_loc`` view, or ``None`` without a reference point."""
+        local = self.view("w_loc")
+        return None if local is None else local.values
+
+    @property
+    def r2(self) -> float | None:
         """``r2_fit`` when the weights come from a fit, else ``r2_samples``.
 
         Kept for code written against gcisens <= 0.1.3, which reported one
@@ -325,6 +387,41 @@ class StudyResult:
         against the ``ranks`` dict of gcisens <= 0.1.2 keeps working.
         """
         return {v.key: v.ranks for v in self.views}
+
+    @property
+    def correlations(self) -> dict[str, float]:
+        """Spearman correlations between the views: ``rho_w_S1``,
+        ``rho_w_ST``, ``rho_S1_ST`` and, with a reference point, ``rho_w_wloc``.
+
+        Tie-aware Spearman on the raw values: exact ties (e.g. two zero
+        weights) get average ranks. NaN when either view is constant.
+        """
+        w, s1, st = self.weights, self.sobol.S1, self.sobol.ST
+        rho = {
+            "rho_w_S1": _spearman(w, s1),
+            "rho_w_ST": _spearman(w, st),
+            "rho_S1_ST": _spearman(s1, st),
+        }
+        local = self.local_weights
+        if local is not None:
+            rho["rho_w_wloc"] = _spearman(w, local)
+        return rho
+
+    @property
+    def metrics(self) -> list[Metric]:
+        """Configuration-level metrics with their display labels: the two R²
+        values, the index sums and the view correlations (cf. KES 2026,
+        Table 5). ``rho_w_wloc`` is present only with a reference point."""
+        s = self.sobol
+        values = {
+            "r2_fit": float("nan") if self.r2_fit is None else self.r2_fit,
+            "r2_samples": float("nan") if self.r2_samples is None else self.r2_samples,
+            "sum_S1": float(s.S1.sum()),
+            "sum_ST": float(s.ST.sum()),
+            "sum_interaction": float(s.interaction.sum()),
+            **self.correlations,
+        }
+        return [Metric(key, METRIC_LABELS[key], value) for key, value in values.items()]
 
     # ------------------------------------------------------------------ tables
     def table(self) -> pd.DataFrame:
@@ -349,7 +446,8 @@ class StudyResult:
         return diagnosis_frame(self.diagnoses)
 
     def summary(self) -> pd.Series:
-        """Configuration-level metrics (cf. KES 2026, Table 5).
+        """Configuration-level metrics (cf. KES 2026, Table 5) followed by
+        the run configuration.
 
         ``r2_fit`` is the R^2 of the fit behind the reported weights (the
         article's value for COMET; NaN for declared weights). ``r2_samples``
@@ -361,38 +459,47 @@ class StudyResult:
         this value as ``n/a``.
         """
         s = self.sobol
-        data = {
-            "r2_fit": float("nan") if self.r2_fit is None else self.r2_fit,
-            "r2_samples": self.r2_samples,
-            "sum_S1": float(s.S1.sum()),
-            "sum_ST": float(s.ST.sum()),
-            "sum_interaction": float(s.interaction.sum()),
-            **self.correlations,
-            "n_samples": s.n_samples,
-            "n_evaluations": s.n_evaluations,
-            "n_r2_samples": self.n_r2_samples,
-            "sampler": s.sampler,
-            "num_resamples": s.num_resamples,
-            "conf_level": s.conf_level,
-            "weights_source": self.weights_source,
-        }
+        data = {m.key: m.value for m in self.metrics}
+        data.update(
+            {
+                "n_samples": s.n_samples,
+                "n_evaluations": s.n_evaluations,
+                "n_r2_samples": self.n_r2_samples,
+                "sampler": s.sampler,
+                "num_resamples": s.num_resamples,
+                "conf_level": s.conf_level,
+                "weights_source": self.weights_source,
+            }
+        )
         return pd.Series(data)
 
     # -------------------------------------------------------------- validation
+    def _require_adapter(self, what: str) -> ModelAdapter:
+        if self.adapter is None:
+            raise ValueError(
+                f"{what} scores new points and needs the model: this result has no "
+                "adapter (it was built by hand, not by SobolStudy.run)"
+            )
+        return self.adapter
+
     def validate(self, X, labels, top_k=(50, 100), ascending=None) -> ValidationResult:
-        """Validate model scores against binary labels (cf. KES 2026, Table 1).
+        """Score ``X`` with the model and validate the scores against binary
+        labels (cf. KES 2026, Table 1); stores and returns the result as
+        :attr:`validation`.
 
         ``ascending`` defaults to the model's score orientation: False for
         COMET (higher = closer to ESP), True for SPOTIS (lower = closer).
+        Needs :attr:`adapter`.
         """
+        adapter = self._require_adapter("validate()")
         if ascending is None:
-            ascending = not self.adapter.higher_is_closer
+            ascending = not adapter.higher_is_closer
         if isinstance(X, pd.DataFrame) and all(name in X.columns for name in self.criteria_names):
             X = X[self.criteria_names]
         X = np.asarray(pd.DataFrame(X).values, dtype=float)
-        if X.shape[1] != self.adapter.n_criteria:
-            raise ValueError(f"X must have {self.adapter.n_criteria} columns, got {X.shape[1]}")
-        scores = self.adapter.scores(X)
+        if X.shape[1] != adapter.n_criteria:
+            raise ValueError(f"X must have {adapter.n_criteria} columns, got {X.shape[1]}")
+        scores = adapter.scores(X)
         self.validation = validate_scores(scores, labels, top_k=top_k, ascending=ascending)
         return self.validation
 
@@ -423,10 +530,14 @@ class StudyResult:
 
     def plot_surface(self, criteria=None, at=None, esps=None, num=100, ax=None):
         """Decision surface over two criteria with the adapter's grid lines and
-        ESPs (cf. ISD 2025, Figs. 1-2); a 2-D slice for models with more criteria."""
+        ESPs (cf. ISD 2025, Figs. 1-2); a 2-D slice for models with more
+        criteria. Needs :attr:`adapter`."""
         from . import plots
 
-        return plots.plot_surface(self, criteria=criteria, at=at, esps=esps, num=num, ax=ax)
+        adapter = self._require_adapter("plot_surface()")
+        return plots.plot_surface(
+            self, adapter, criteria=criteria, at=at, esps=esps, num=num, ax=ax
+        )
 
     # ----------------------------------------------------------------- exports
     def to_csv(self, directory, prefix: str = "results") -> list[Path]:
@@ -460,32 +571,35 @@ class StudyResult:
 
 
 class Comparison:
-    """Side-by-side comparison of several study results (cf. Table 5)."""
+    """Side-by-side comparison of several study results (cf. Table 5).
 
-    METRICS = (
-        "r2_fit",
-        "r2_samples",
-        "sum_S1",
-        "sum_ST",
-        "sum_interaction",
-        "rho_w_S1",
-        "rho_w_ST",
-        "rho_S1_ST",
-        "rho_w_wloc",
-    )
+    The rows are the union of the results' :attr:`StudyResult.metrics`, in
+    first-seen order; a metric a result lacks (``rho_w_wloc`` without a
+    reference point) is NaN in its column. Display labels come from the
+    metrics themselves.
+    """
 
     def __init__(self, results: dict[str, StudyResult]):
         if not results:
             raise ValueError("compare() needs at least one result")
         self.results = dict(results)
 
+    def labels(self) -> dict[str, str]:
+        """Metric key -> display label, in table row order."""
+        labels: dict[str, str] = {}
+        for res in self.results.values():
+            for metric in res.metrics:
+                labels.setdefault(metric.key, metric.label)
+        return labels
+
     def table(self) -> pd.DataFrame:
         """Metrics as rows, configurations as columns."""
+        keys = list(self.labels())
         cols = {}
         for name, res in self.results.items():
-            summary = res.summary()
-            cols[name] = [summary.get(m, float("nan")) for m in self.METRICS]
-        return pd.DataFrame(cols, index=list(self.METRICS))
+            values = {m.key: m.value for m in res.metrics}
+            cols[name] = [values.get(k, float("nan")) for k in keys]
+        return pd.DataFrame(cols, index=keys)
 
     def to_latex(self, path=None, caption=None, label=None) -> str:
         from . import export

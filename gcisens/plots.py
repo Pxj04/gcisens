@@ -8,8 +8,9 @@ for any scoring model) and follow the same conventions by hand: default
 matplotlib colour cycle, black-edged bars, dashed recessive grid, legends
 above the axes. Each function returns the matplotlib Axes it drew on.
 
-Plots only see the study result and its adapter (scores, bounds, names,
-ESPs, grid lines); they never inspect the underlying model.
+Plots read the study result, a plain record; only :func:`plot_surface`
+also takes the model adapter (scores, bounds, ESPs, grid lines) because it
+evaluates the model on a grid. None of them inspect the underlying model.
 """
 
 from __future__ import annotations
@@ -188,7 +189,15 @@ def plot_validation(result, ax=None):
 
 
 def plot_surface(
-    result, criteria=None, at=None, esps=None, num=100, ax=None, cmap="Greens", levels=14
+    result,
+    adapter,
+    criteria=None,
+    at=None,
+    esps=None,
+    num=100,
+    ax=None,
+    cmap="Greens",
+    levels=14,
 ):
     """Decision surface over two criteria with the evaluation grid and ESPs.
 
@@ -203,7 +212,10 @@ def plot_surface(
     Parameters
     ----------
     result : StudyResult
-        The study result (provides the model, bounds and names).
+        The study result (names, ST for the default criteria, reference point).
+    adapter : ModelAdapter
+        The model handle (scores, bounds, grid lines, ESPs), e.g.
+        ``result.adapter``.
     criteria : tuple of int or str, optional
         The two criteria to plot; defaults to the two with the highest ST.
     at : array-like, optional
@@ -219,7 +231,8 @@ def plot_surface(
     -------
     ax : matplotlib Axes
     """
-    adapter = result.adapter
+    if adapter is None:
+        raise ValueError("plot_surface needs the model adapter (result.adapter)")
     names = result.criteria_names
     m = adapter.n_criteria
 
