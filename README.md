@@ -103,7 +103,7 @@ result = SobolStudy(model, n_samples=2048, seed=42).run()
 
 result.table()        # weights, S1, ST, ranks, category per criterion
 result.diagnosis()    # Sensitivity Discrepancy Report
-result.summary()      # R², ΣS1, ΣST, Spearman correlations
+result.summary()      # r2_fit, r2_samples, ΣS1, ΣST, Spearman correlations
 result.plot_indices() # w vs S1 vs ST bar chart
 result.to_latex()     # publication-ready table
 ```

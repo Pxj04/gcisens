@@ -110,6 +110,10 @@ class SobolStudy:
     local_percent_step : float
         Step size as a fraction of each criterion range for local-weight
         sweeps. The default is 0.01.
+    n_r2_samples : int
+        Number of uniform sample points over ``bounds``. The study computes
+        :attr:`StudyResult.r2_samples` on this seeded sample. Must be at
+        least the number of criteria plus two. The default is 4096.
 
     Examples
     --------
@@ -135,8 +139,10 @@ class SobolStudy:
         conf_level: float = 0.95,
         thresholds: DiagnosisThresholds | None = None,
         local_percent_step: float = 0.01,
+        n_r2_samples: int = 4096,
     ):
         self.adapter = make_adapter(model, bounds, criteria_names, weights, types)
+        self.n_r2_samples = self._validate_n_r2_samples(n_r2_samples, self.adapter.n_criteria)
         self.sampler = validate_sampler(sampler)
         self.n_samples = validate_n_samples(n_samples)
         self.second_order = bool(second_order)
@@ -186,22 +192,25 @@ class SobolStudy:
                 conf_level=self.conf_level,
             )
 
-        # 2. Declared / global weights + linear-fit quality (R^2).
+        # 2. Declared weights + linear-fit quality (R^2).
+        # ``r2_samples`` is a linear fit on one seeded uniform sample over the
+        # bounds, computed the same way for every model so that studies can
+        # be compared. ``r2_fit`` is the R^2 of the fit that produced the
+        # reported weights (None when the weights are declared).
+        sample_fit = self._sample_regression(adapter)
         declared = adapter.declared_weights()
         if declared is None:
-            # No declared weights (bare callable): report regression weights
-            # derived from a fresh uniform sample over the bounds.
-            fit = self._sample_regression(adapter)
-            weights_arr, weights_source, r2 = fit.weights, "regression (samples)", fit.r2
+            # No declared weights (bare callable): report the regression
+            # weights from the uniform sample.
+            weights_arr, weights_source = sample_fit.weights, "regression (samples)"
+            r2_fit = sample_fit.r2
         else:
             weights_arr = np.asarray(declared, dtype=float)
             r2_fn = getattr(adapter, "declared_weights_r2", None)
-            r2 = r2_fn() if callable(r2_fn) else None
-            weights_source = "regression (characteristic objects)" if r2 is not None else "declared"
-            if r2 is None:
-                # Declared weights (e.g. SPOTIS): R^2 still reported so the
-                # linear-approximation quality is comparable across models.
-                r2 = self._sample_regression(adapter).r2
+            r2_fit = r2_fn() if callable(r2_fn) else None
+            weights_source = (
+                "regression (characteristic objects)" if r2_fit is not None else "declared"
+            )
 
         # 3. Local weights at the reference point.
         local = None
@@ -233,7 +242,8 @@ class SobolStudy:
             adapter=adapter,
             weights=weights_arr,
             weights_source=weights_source,
-            r2=float(r2),
+            r2_fit=None if r2_fit is None else float(r2_fit),
+            r2_samples=float(sample_fit.r2),
             local_weights=local,
             reference_point=point,
             sobol=sobol,
@@ -241,11 +251,28 @@ class SobolStudy:
             correlations=correlations,
             diagnoses=diagnoses,
             thresholds=self.thresholds,
+            n_r2_samples=self.n_r2_samples,
         )
 
+    @staticmethod
+    def _validate_n_r2_samples(n_r2_samples, n_criteria: int) -> int:
+        minimum = n_criteria + 2
+        n_r2_samples = int(n_r2_samples)
+        if n_r2_samples < minimum:
+            raise ValueError(
+                f"n_r2_samples must be at least n_criteria + 2 = {minimum} so that the "
+                f"linear fit is not saturated, got {n_r2_samples}"
+            )
+        return n_r2_samples
+
     def _sample_regression(self, adapter) -> RegressionWeights:
+        """Linear fit on a seeded uniform sample over the bounds."""
         rng = np.random.default_rng(self.seed)
-        X = rng.uniform(adapter.bounds[:, 0], adapter.bounds[:, 1], size=(4096, adapter.n_criteria))
+        X = rng.uniform(
+            adapter.bounds[:, 0],
+            adapter.bounds[:, 1],
+            size=(self.n_r2_samples, adapter.n_criteria),
+        )
         return regression_weights(X, adapter.scores(X), adapter.bounds)
 
 
@@ -256,7 +283,14 @@ class StudyResult:
     adapter: object
     weights: np.ndarray
     weights_source: str
-    r2: float
+    #: R^2 of the fit behind the reported weights: the characteristic-object
+    #: regression for COMET, the sample regression for a callable without
+    #: weights, ``None`` for declared weights (SPOTIS).
+    r2_fit: float | None
+    #: R^2 of a linear fit on one uniform sample over the bounds; computed the
+    #: same way for every model, so use it to compare studies. Studies with
+    #: the same ``seed`` and ``bounds`` share the sample points.
+    r2_samples: float
     local_weights: np.ndarray | None
     reference_point: np.ndarray | None
     sobol: SobolIndices
@@ -264,11 +298,23 @@ class StudyResult:
     correlations: dict
     diagnoses: list[CriterionDiagnosis]
     thresholds: DiagnosisThresholds
+    #: Size of the uniform sample behind :attr:`r2_samples`.
+    n_r2_samples: int = 4096
     validation: ValidationResult | None = field(default=None)
 
     @property
     def criteria_names(self) -> list[str]:
         return self.sobol.criteria_names
+
+    @property
+    def r2(self) -> float:
+        """``r2_fit`` when the weights come from a fit, else ``r2_samples``.
+
+        Kept for code written against gcisens <= 0.1.3, which reported one
+        ``r2`` with exactly this meaning. New code should read
+        :attr:`r2_fit` or :attr:`r2_samples` explicitly.
+        """
+        return self.r2_samples if self.r2_fit is None else self.r2_fit
 
     @property
     def ranks(self) -> dict[str, np.ndarray]:
@@ -304,19 +350,26 @@ class StudyResult:
     def summary(self) -> pd.Series:
         """Configuration-level metrics (cf. KES 2026, Table 5).
 
+        ``r2_fit`` is the R^2 of the fit behind the reported weights (the
+        article's value for COMET; NaN for declared weights). ``r2_samples``
+        is the R^2 of a linear fit on one uniform sample of ``n_r2_samples``
+        points, computed the same way for every model; compare studies on it.
+
         A Spearman correlation is NaN when either input view is constant,
         because its ranks have zero variance. LaTeX and HTML exports display
         this value as ``n/a``.
         """
         s = self.sobol
         data = {
-            "R2": self.r2,
+            "r2_fit": float("nan") if self.r2_fit is None else self.r2_fit,
+            "r2_samples": self.r2_samples,
             "sum_S1": float(s.S1.sum()),
             "sum_ST": float(s.ST.sum()),
             "sum_interaction": float(s.interaction.sum()),
             **self.correlations,
             "n_samples": s.n_samples,
             "n_evaluations": s.n_evaluations,
+            "n_r2_samples": self.n_r2_samples,
             "sampler": s.sampler,
             "num_resamples": s.num_resamples,
             "conf_level": s.conf_level,
@@ -409,7 +462,8 @@ class Comparison:
     """Side-by-side comparison of several study results (cf. Table 5)."""
 
     METRICS = (
-        "R2",
+        "r2_fit",
+        "r2_samples",
         "sum_S1",
         "sum_ST",
         "sum_interaction",

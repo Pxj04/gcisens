@@ -84,7 +84,9 @@ def test_experiment_1_reproduces_table_2(hr_bounds):
     np.testing.assert_allclose(res.sobol.ST, TABLE2[:, 3], atol=2e-3)
 
     summary = res.summary()
-    assert summary["R2"] == pytest.approx(0.9421, abs=1e-4)
+    # The article's R^2 is the characteristic-object fit behind the weights.
+    assert res.r2_fit == pytest.approx(0.9421, abs=1e-4)
+    assert summary["r2_fit"] == pytest.approx(0.9421, abs=1e-4)
     assert summary["rho_w_S1"] == pytest.approx(1.0)
     assert summary["rho_w_ST"] == pytest.approx(1.0)
     assert all(d.category == CONFIRMED_TRANSPARENCY for d in res.diagnoses)
@@ -99,7 +101,7 @@ def test_experiment_3_reproduces_table_4(hr_bounds):
     np.testing.assert_allclose(res.sobol.ST, TABLE4[:, 3], atol=2e-3)
 
     summary = res.summary()
-    assert summary["R2"] == pytest.approx(0.7628, abs=1e-4)
+    assert res.r2_fit == pytest.approx(0.7628, abs=1e-4)
     assert summary["sum_interaction"] == pytest.approx(0.1447, abs=2e-3)
     assert summary["rho_w_S1"] == pytest.approx(0.8571, abs=1e-4)
 
@@ -118,7 +120,8 @@ def test_cross_configuration_comparison_reproduces_table_5(hr_bounds):
     }
     table = compare(results).table()
 
-    np.testing.assert_allclose(table.loc["R2"], [0.9421, 0.8099, 0.7628], atol=1e-4)
+    np.testing.assert_allclose(table.loc["r2_fit"], [0.9421, 0.8099, 0.7628], atol=1e-4)
+    assert table.loc["r2_samples"].between(0, 1).all()
     np.testing.assert_allclose(table.loc["sum_S1"], [0.9865, 0.9840, 0.9305], atol=2e-3)
     np.testing.assert_allclose(table.loc["sum_ST"], [1.0197, 1.0128, 1.0752], atol=2e-3)
     # ESP2 has two numerically-zero weights; the 0.9643/1.0000 split between
