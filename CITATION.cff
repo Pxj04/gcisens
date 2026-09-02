@@ -8,9 +8,11 @@ abstract: >-
 authors:
   - family-names: "Śniegowski"
     given-names: "Szymon"
+    email: "szymon-sniegowski@zut.edu.pl"
     orcid: "https://orcid.org/0009-0005-7381-7323"
   - family-names: "Świder"
     given-names: "Adrianna"
+    email: "adrianna-swider@zut.edu.pl"
     orcid: "https://orcid.org/0009-0009-3544-457X"
 version: "0.1.3"
 license: MIT

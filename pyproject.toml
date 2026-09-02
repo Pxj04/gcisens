@@ -9,8 +9,8 @@ description = "Variance-based (Sobol') sensitivity analysis and Sensitivity Disc
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "Szymon Sniegowski" },
-    { name = "Adrianna Świder" },
+    { name = "Szymon Sniegowski", email = "szymon-sniegowski@zut.edu.pl" },
+    { name = "Adrianna Świder", email = "adrianna-swider@zut.edu.pl" },
 ]
 requires-python = ">=3.11"
 keywords = [

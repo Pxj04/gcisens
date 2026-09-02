@@ -147,7 +147,7 @@ its thresholds.
 | C6 | Software code languages, tools and services used | Python |
 | C7 | Compilation requirements, operating environments and dependencies | Python >= 3.11; NumPy >= 2.3, pandas, SciPy, scikit-learn, SALib, pymcdm >= 1.4, Matplotlib |
 | C8 | Link to developer documentation/manual | https://gcisens.readthedocs.io |
-| C9 | Support for questions | [GitHub issues](https://github.com/Pxj04/gcisens/issues) |
+| C9 | Support email for questions | szymon-sniegowski@zut.edu.pl, adrianna-swider@zut.edu.pl ([GitHub issues](https://github.com/Pxj04/gcisens/issues) for bug reports) |
 
 ## Citing
 
@@ -163,11 +163,12 @@ references below.
   Detecting Hidden Criterion Influence When Weights Mislead in Rule-Based
   Decision Support Systems. *30th International Conference on Knowledge-Based
   and Intelligent Information & Engineering Systems (KES 2026)*, to appear.
-- Sałabun, W., Shekhovtsov, A., & Wątróbski, J. (2025). Variance-Based
-  Analysis of Global Criteria Importance in the ESP-COMET Method.
-  *[Proceedings of the 33rd International Conference on Information Systems
-  Development (ISD 2025)](https://aisel.aisnet.org/isd2014/proceedings2025/)*,
-  University of Gdańsk / University of Belgrade, ISBN 978-83-972632-1-5.
+- Sałabun, W., Shekhovtsov, A., & Wątróbski, J. (2025). [Variance-Based
+  Analysis of Global Criteria Importance in the ESP-COMET
+  Method](https://doi.org/10.62036/ISD.2025.83). In I. Luković et al. (Eds.),
+  *Empowering the Interdisciplinary Role of ISD in Addressing Contemporary
+  Issues in Digital Transformation (ISD 2025 Proceedings)*. University of
+  Gdańsk & University of Belgrade. ISBN 978-83-972632-1-5.
 - Więckowski, J., Kizielewicz, B., Shekhovtsov, A., & Sałabun, W. (2023).
   [How do the criteria affect sustainable supplier evaluation? A case study
   using multi-criteria decision analysis methods in a fuzzy environment
