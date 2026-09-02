@@ -68,14 +68,12 @@ def to_latex(result, path=None, caption=None, label=None) -> str:
         "Weights and Sobol' indices with the Sensitivity Discrepancy Report."
     )
     label = label or "tab:sobol_indices"
-    has_local = result.local_weights is not None
+    views = result.views
     s = result.sobol
+    extras = [r"$ST - S1$", r"$S1_{\mathrm{conf}}$", r"$ST_{\mathrm{conf}}$"]
 
-    cols = "|l|" + "c|" * (7 if has_local else 6)
-    header = r"\textbf{Criterion} & $w$"
-    if has_local:
-        header += r" & $w_{\text{loc}}$"
-    header += r" & $S1$ & $ST$ & $ST - S1$ & $S1_{\text{conf}}$ & $ST_{\text{conf}}$ \\"
+    cols = "|l|" + "c|" * (len(views) + len(extras))
+    header = " & ".join([r"\textbf{Criterion}", *(v.label for v in views), *extras]) + r" \\"
 
     lines = [
         r"\begin{table}[h]",
@@ -88,22 +86,12 @@ def to_latex(result, path=None, caption=None, label=None) -> str:
         r"\hline",
     ]
     for i, name in enumerate(result.criteria_names):
-        row = [name, _fmt(result.weights[i])]
-        if has_local:
-            row.append(_fmt(result.local_weights[i]))
-        row += [
-            _fmt(s.S1[i]),
-            _fmt(s.ST[i]),
-            _fmt(s.ST[i] - s.S1[i]),
-            _fmt(s.S1_conf[i]),
-            _fmt(s.ST_conf[i]),
-        ]
+        row = [name, *(_fmt(v.values[i]) for v in views),
+               _fmt(s.interaction[i]), _fmt(s.S1_conf[i]), _fmt(s.ST_conf[i])]
         lines.append(" & ".join(row) + r" \\")
     lines.append(r"\hline")
-    sums = [r"$\sum$", _fmt(result.weights.sum())]
-    if has_local:
-        sums.append(_fmt(result.local_weights.sum()))
-    sums += [_fmt(s.S1.sum()), _fmt(s.ST.sum()), _fmt(s.interaction.sum()), "", ""]
+    sums = [r"$\sum$", *(_fmt(v.values.sum()) for v in views),
+            _fmt(s.interaction.sum()), "", ""]
     lines.append(" & ".join(sums) + r" \\")
     lines += [r"\hline", r"\end{tabular}", r"\end{table}"]
 
@@ -125,7 +113,7 @@ def s2_to_latex(result, path=None, top: int = 10, caption=None, label=None) -> s
         rf"\label{{{label}}}",
         r"\begin{tabular}{|l|l|c|c|}",
         r"\hline",
-        r"\textbf{Criterion $i$} & \textbf{Criterion $j$} & $S2$ & $S2_{\text{conf}}$ \\",
+        r"\textbf{Criterion $i$} & \textbf{Criterion $j$} & $S2$ & $S2_{\mathrm{conf}}$ \\",
         r"\hline",
     ]
     for _, row in pairs.iterrows():

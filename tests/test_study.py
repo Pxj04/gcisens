@@ -68,19 +68,6 @@ def test_callable_without_bounds_raises(linear_model):
         SobolStudy(score, n_samples=64)
 
 
-def test_local_weights_only_with_reference_point(linear_model):
-    score, bounds = linear_model
-    study = SobolStudy(score, bounds=bounds, weights=np.array([0.7, 0.3]),
-                       n_samples=64, seed=0)
-    without = study.run()
-    assert without.local_weights is None
-    assert "w_loc" not in without.table().columns
-
-    with_ref = study.run(reference_point=[5, 5])
-    np.testing.assert_allclose(with_ref.local_weights, [0.7, 0.3], atol=1e-6)
-    assert "rho_w_wloc" in with_ref.correlations
-
-
 def test_validation_lift_and_orientation(linear_model):
     score, bounds = linear_model
     result = SobolStudy(score, bounds=bounds, weights=np.array([0.7, 0.3]),

@@ -69,19 +69,18 @@ class CriterionDiagnosis:
     detail: str
 
 
-def rank_descending(values: np.ndarray) -> np.ndarray:
-    """Ordinal ranks (1 = largest value)."""
-    order = np.argsort(-np.asarray(values))
-    ranks = np.empty(len(values), dtype=int)
-    ranks[order] = np.arange(1, len(values) + 1)
-    return ranks
+def rank_descending(values) -> np.ndarray:
+    """Descending ranks (1 = largest value); exact ties share their average rank.
 
-
-def _rank_tie_average(values: np.ndarray) -> np.ndarray:
-    """Descending ranks with average ranks for exact ties."""
+    The single rank definition of the package: the results table, the ranking
+    plot and the displacement rule in :func:`classify` all use it, so the
+    ranks printed next to a diagnosis are the ranks the diagnosis was made
+    from. Tied values (e.g. equal declared weights) never produce arbitrary
+    input-order displacements.
+    """
     from scipy.stats import rankdata
 
-    return rankdata(-np.asarray(values), method="average")
+    return rankdata(-np.asarray(values, dtype=float), method="average")
 
 
 def classify(
@@ -95,10 +94,8 @@ def classify(
     t = thresholds or DiagnosisThresholds()
     m = len(criteria_names)
     equal_share = 1.0 / m
-    # Tie-average ranks: exactly-tied weights (e.g. equal declared weights)
-    # must not produce arbitrary ordinal displacements.
-    rank_w = _rank_tie_average(weights)
-    rank_s1 = _rank_tie_average(S1)
+    rank_w = rank_descending(weights)
+    rank_s1 = rank_descending(S1)
 
     diagnoses = []
     for i, name in enumerate(criteria_names):
