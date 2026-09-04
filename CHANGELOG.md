@@ -24,7 +24,7 @@ This file records notable changes to the project. The format follows
 - `StudyResult.view(key)`.
 - `sweep_thresholds()` and `StudyResult.sweep_thresholds()`: re-classify the criteria over a grid of threshold values.
 - Documentation page "Methodology": assumptions and limitations, and a worked threshold-sensitivity example.
-- `CITATION.cff`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `examples/data/README.md` (dataset origin and licence) and a SoftwareX code-metadata table in the README.
+- `CITATION.cff`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `examples/data/README.md` (dataset origin and licence).
 - Source-article and local-weights references in the README.
 
 ### Changed
