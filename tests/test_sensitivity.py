@@ -110,3 +110,87 @@ def test_unknown_sampler_rejected(linear_model):
     score, bounds = linear_model
     with pytest.raises(ValueError, match="sampler"):
         sobol_analysis(score, bounds, ["A", "B"], sampler="lhs")
+
+
+@pytest.mark.parametrize("sampler", ["saltelli", "sobol"])
+@pytest.mark.parametrize("seed", [0, 42])
+def test_seed_repeats_all_indices_and_confidence_intervals(linear_model, sampler, seed):
+    score, bounds = linear_model
+    first = sobol_analysis(score, bounds, ["A", "B"], n_samples=64, sampler=sampler, seed=seed)
+    second = sobol_analysis(score, bounds, ["A", "B"], n_samples=64, sampler=sampler, seed=seed)
+    for name in ("S1", "ST", "S1_conf", "ST_conf", "S2", "S2_conf"):
+        np.testing.assert_array_equal(getattr(first, name), getattr(second, name))
+
+
+def test_positive_seed_preserves_salib_bootstrap_samples(linear_model):
+    from SALib.analyze import sobol
+    from SALib.sample import sobol as sampler
+
+    score, bounds = linear_model
+    problem = {"num_vars": 2, "names": ["A", "B"], "bounds": bounds.tolist()}
+    samples = sampler.sample(problem, 64, seed=42)
+    expected = sobol.analyze(problem, score(samples), seed=42)
+    result = sobol_analysis(score, bounds, ["A", "B"], n_samples=64, sampler="sobol", seed=42)
+    for name in ("S1", "ST", "S1_conf", "ST_conf", "S2", "S2_conf"):
+        np.testing.assert_array_equal(getattr(result, name), expected[name])
+
+
+@pytest.mark.parametrize(
+    "value, message", [(1.0, "constant"), (np.nan, "finite"), (np.inf, "finite")]
+)
+def test_undefined_scores_fail_before_diagnosis(value, message):
+    with pytest.raises(ValueError, match=message):
+        sobol_analysis(lambda X: np.full(len(X), value), [[0, 1]], ["A"], n_samples=8)
+
+
+@pytest.mark.parametrize(
+    "setting, value",
+    [
+        ("n_samples", 8.5),
+        ("n_samples", True),
+        ("n_samples", "8"),
+        ("num_resamples", 1),
+        ("num_resamples", 5.5),
+        ("num_resamples", False),
+        ("conf_level", 0),
+        ("conf_level", 1),
+        ("conf_level", np.nan),
+        ("seed", -1),
+        ("seed", 1.5),
+        ("seed", True),
+        ("second_order", "false"),
+    ],
+)
+def test_invalid_sampling_settings_fail_before_model_evaluation(setting, value):
+    def must_not_run(X):
+        raise AssertionError("Model must not be called for invalid settings")
+
+    settings = {"n_samples": 8, setting: value}
+    with pytest.raises(ValueError, match=setting):
+        sobol_analysis(must_not_run, [[0, 1]], ["A"], **settings)
+
+
+def test_sobol_indices_own_immutable_arrays_and_names(linear_model):
+    from dataclasses import FrozenInstanceError, replace
+
+    score, bounds = linear_model
+    result = sobol_analysis(score, bounds, ["A", "B"], n_samples=64, seed=42)
+    values = result.S1.copy()
+    names = ["A", "B"]
+    copied = replace(result, S1=values, criteria_names=names)
+    values[:] = 0
+    names[0] = "changed"
+    np.testing.assert_array_equal(copied.S1, result.S1)
+    assert copied.criteria_names == ("A", "B")
+    with pytest.raises(ValueError):
+        copied.S1[0] = 0
+    with pytest.raises(ValueError):
+        copied.S1.setflags(write=True)
+    with pytest.raises(FrozenInstanceError):
+        copied.S1 = values
+
+
+def test_single_criterion_has_empty_second_order_table():
+    result = sobol_analysis(lambda X: X[:, 0], [[0, 1]], ["A"], n_samples=64, seed=42)
+    assert result.s2_pairs().empty
+    assert list(result.s2_pairs()) == ["criterion_i", "criterion_j", "S2", "S2_conf", "significant"]

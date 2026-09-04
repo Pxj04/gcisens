@@ -83,3 +83,36 @@ def test_thresholds_are_configurable():
     st = [0.45, 0.30, 0.21, 0.10]
     strict = DiagnosisThresholds(interaction_ratio=0.9, interaction_abs=0.5)
     assert categories(w, s1, st, strict)[0] != INTERACTION_DOMINANCE
+
+
+def test_nonfinite_indices_cannot_receive_a_diagnosis():
+    import pytest
+
+    for value in (np.nan, np.inf, -np.inf):
+        for field in ("S1", "ST"):
+            inputs = {"S1": [0.8, 0.2], "ST": [0.8, 0.2], field: [0.8, value]}
+            with pytest.raises(ValueError, match=field):
+                classify(["A", "B"], [0.8, 0.2], **inputs)
+
+
+def test_finite_negative_estimates_are_allowed():
+    result = classify(["A", "B"], [1.0, 0.0], [1.01, -0.01], [1.0, -0.002])
+    assert len(result) == 2
+
+
+def test_transparency_detail_states_threshold_limit():
+    diagnosis = classify(["A"], [1.0], [1.0], [1.0])[0]
+    assert "no discrepancy detected under the chosen thresholds" in diagnosis.detail
+
+
+def test_thresholds_are_validated_and_cannot_change():
+    from dataclasses import FrozenInstanceError
+
+    import pytest
+
+    for settings in ({"hidden_st_excess": np.nan}, {"s2_min_abs": -1}, {"rank_displacement": 1.5}):
+        with pytest.raises(ValueError):
+            DiagnosisThresholds(**settings)
+    thresholds = DiagnosisThresholds()
+    with pytest.raises(FrozenInstanceError):
+        thresholds.hidden_st_excess = 0.5

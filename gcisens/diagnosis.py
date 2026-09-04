@@ -8,10 +8,10 @@ indices — and labelled with the first matching category:
 2. ``interaction dominance`` — interactions dominate the criterion's effect;
 3. ``moderate discrepancy`` — displaced ranking, or a dismissed-but-influential
    criterion;
-4. ``confirmed transparency`` — the weight is a faithful account of influence.
+4. ``confirmed transparency`` — no discrepancy detected under the chosen thresholds.
 
-The thresholds are the article's defaults for preference scores normalised to
-[0, 1]; the article explicitly frames them as context-dependent, so they are a
+The thresholds apply to normalized weights and dimensionless Sobol indices.
+They are context-dependent, so they are a
 parameter (:class:`DiagnosisThresholds`), not constants.
 """
 
@@ -19,9 +19,12 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass, fields, replace
+from numbers import Integral, Real
 
 import numpy as np
 import pandas as pd
+
+from .adapters import validate_criteria_names, validate_weights
 
 
 class Category(str):
@@ -73,13 +76,13 @@ CATEGORIES = (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class DiagnosisThresholds:
     """Decision-rule thresholds of the Sensitivity Discrepancy Report.
 
-    Defaults follow Śniegowski et al. (KES 2026), Section 3, for scores and
-    indices on a [0, 1] scale with a moderate number of criteria. Recalibrate
-    for other decision contexts.
+    Defaults follow Śniegowski et al. (KES 2026), Section 3. Review them for
+    other decision contexts, input distributions and numbers of criteria.
+    A change of output units alone does not change Sobol indices.
     """
 
     #: hidden influence: ``w < hidden_weight_factor * (1/m)`` ...
@@ -102,6 +105,23 @@ class DiagnosisThresholds:
     #: ... and ``abs(S2) > s2_min_abs``.
     s2_min_abs: float = 0.01
 
+    def __post_init__(self):
+        for field in fields(self):
+            value = getattr(self, field.name)
+            if (
+                isinstance(value, (bool, np.bool_))
+                or not isinstance(value, Real)
+                or not np.isfinite(value)
+                or value < 0
+            ):
+                raise ValueError(f"{field.name} must be a finite non-negative number")
+            if field.name == "rank_displacement":
+                if not isinstance(value, Integral):
+                    raise ValueError("rank_displacement must be an integer")
+                object.__setattr__(self, field.name, int(value))
+            else:
+                object.__setattr__(self, field.name, float(value))
+
     def is_s2_significant(self, value: float, conf: float) -> bool:
         """Return whether an S2 estimate clears both significance thresholds."""
         return bool(
@@ -109,7 +129,7 @@ class DiagnosisThresholds:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class CriterionDiagnosis:
     """Diagnostic label for one criterion.
 
@@ -122,7 +142,7 @@ class CriterionDiagnosis:
     detail: str
 
     def __post_init__(self):
-        self.category = Category.of(self.category)
+        object.__setattr__(self, "category", Category.of(self.category))
 
 
 def rank_descending(values) -> np.ndarray:
@@ -149,6 +169,14 @@ def classify(
     """Label every criterion with the first matching discrepancy category."""
     t = thresholds or DiagnosisThresholds()
     m = len(criteria_names)
+    if not m:
+        raise ValueError("classification requires at least one criterion")
+    criteria_names = validate_criteria_names(criteria_names, m)
+    weights = validate_weights(weights, m)
+    S1, ST = np.asarray(S1, dtype=float), np.asarray(ST, dtype=float)
+    for name, values in (("S1", S1), ("ST", ST)):
+        if values.shape != (m,) or not np.isfinite(values).all():
+            raise ValueError(f"{name} must contain one finite index per criterion")
     equal_share = 1.0 / m
     rank_w = rank_descending(weights)
     rank_s1 = rank_descending(S1)
@@ -181,7 +209,10 @@ def classify(
                 detail = f"w={w:.4f} dismisses a criterion with ST={st:.4f}"
         else:
             category = CONFIRMED_TRANSPARENCY
-            detail = f"w={w:.4f}, S1={s1:.4f}, ST={st:.4f} agree (ST-S1={gap:.4f})"
+            detail = (
+                "no discrepancy detected under the chosen thresholds "
+                f"(w={w:.4f}, S1={s1:.4f}, ST={st:.4f}, ST-S1={gap:.4f})"
+            )
 
         diagnoses.append(CriterionDiagnosis(str(name), category, detail))
     return diagnoses

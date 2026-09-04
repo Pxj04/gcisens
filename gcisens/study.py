@@ -11,9 +11,13 @@ The pipeline (Śniegowski et al., KES 2026; Sałabun et al., ISD 2025):
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+import platform
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
@@ -33,11 +37,14 @@ from .sensitivity import (
     NON_POWER_OF_TWO_WARNING,
     SobolIndices,
     sobol_analysis,
+    validate_bootstrap,
+    validate_integer,
     validate_n_samples,
     validate_sampler,
+    validate_seed,
 )
 from .validation import ValidationResult, validate_scores
-from .weights import RegressionWeights, regression_weights
+from .weights import RegressionWeights, regression_weights, validate_percent_step
 
 logger = logging.getLogger("gcisens")
 
@@ -53,7 +60,40 @@ def _spearman(a, b) -> float:
     return float(spearmanr(a, b).statistic)
 
 
-@dataclass
+def _result_digest(views, sobol, point, r2_fit, r2_samples, n_r2_samples, weights_source):
+    """Identify numerical data so a copied result cannot retain false provenance."""
+    digest = hashlib.sha256()
+    for view in views:
+        digest.update(view.key.encode())
+        digest.update(np.asarray(view.values, dtype="<f8").tobytes())
+    for name in ("S1", "ST", "S1_conf", "ST_conf", "S2", "S2_conf"):
+        values = getattr(sobol, name)
+        if values is not None:
+            digest.update(np.asarray(values, dtype="<f8").tobytes())
+    digest.update(
+        json.dumps(
+            {
+                "names": list(sobol.criteria_names),
+                "point": None if point is None else np.asarray(point).tolist(),
+                "r2_fit": r2_fit,
+                "r2_samples": r2_samples,
+                "n_r2_samples": n_r2_samples,
+                "weights_source": weights_source,
+                "sampler": sobol.sampler,
+                "n_samples": sobol.n_samples,
+                "n_evaluations": sobol.n_evaluations,
+                "output_mean": sobol.output_mean,
+                "output_std": sobol.output_std,
+                "num_resamples": sobol.num_resamples,
+                "conf_level": sobol.conf_level,
+            },
+            sort_keys=True,
+        ).encode()
+    )
+    return digest.hexdigest()
+
+
+@dataclass(frozen=True, eq=False)
 class View:
     """One view of criteria importance: a value per criterion and the ranking
     it induces.
@@ -70,12 +110,17 @@ class View:
     #: Math label shared by LaTeX and matplotlib, e.g. ``$w_{\mathrm{loc}}$``.
     label: str
     values: np.ndarray
-    #: Ranks induced by ``values`` (see :func:`gcisens.diagnosis.rank_descending`).
-    ranks: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        self.values = np.asarray(self.values, dtype=float)
-        self.ranks = rank_descending(self.values)
+        values = np.asarray(self.values, dtype=float)
+        if values.ndim != 1 or not np.isfinite(values).all():
+            raise ValueError("view values must be a finite 1-D array")
+        object.__setattr__(self, "values", np.frombuffer(values.tobytes(), dtype=float))
+
+    @property
+    def ranks(self) -> np.ndarray:
+        """Ranks derived from the current values, with average ranks for ties."""
+        return rank_descending(self.values)
 
 
 @dataclass(frozen=True)
@@ -100,9 +145,10 @@ class SobolStudy:
     Parameters
     ----------
     model : COMET, SPOTIS or callable
-        The scoring model. pymcdm models are recognised automatically; any
-        callable ``f(X) -> scores`` works as a fallback (then ``bounds`` and,
-        for a discrepancy report, ``weights`` must be given).
+        The scoring model. pymcdm models are recognised automatically; a deterministic
+        callable ``f(X) -> scores`` can be used with explicit ``bounds``. Its
+        score for a point must not depend on other rows in the batch. Without
+        input ``weights``, the study estimates weights by regression.
     bounds : ndarray of shape (m, 2), optional
         Criteria bounds. Not needed for models built with
         :func:`gcisens.esp_comet` / :func:`gcisens.esp_spotis` (metadata) or
@@ -176,12 +222,13 @@ class SobolStudy:
         self.n_r2_samples = self._validate_n_r2_samples(n_r2_samples, self.adapter.n_criteria)
         self.sampler = validate_sampler(sampler)
         self.n_samples = validate_n_samples(n_samples)
+        if not isinstance(second_order, (bool, np.bool_)):
+            raise TypeError("second_order must be a boolean")
         self.second_order = bool(second_order)
-        self.seed = seed
-        self.num_resamples = num_resamples
-        self.conf_level = conf_level
+        self.seed = validate_seed(seed)
+        self.num_resamples, self.conf_level = validate_bootstrap(num_resamples, conf_level)
         self.thresholds = thresholds or DiagnosisThresholds()
-        self.local_percent_step = local_percent_step
+        self.local_percent_step = validate_percent_step(local_percent_step)
 
     def run(self, reference_point=None) -> StudyResult:
         """Execute the full pipeline and return a :class:`StudyResult`.
@@ -195,6 +242,9 @@ class SobolStudy:
         adapter = self.adapter
         names = adapter.criteria_names
         m = adapter.n_criteria
+        seed = self.seed
+        if seed is None:
+            seed = int(np.random.SeedSequence().generate_state(1)[0])
 
         logger.info(
             "Sobol study: %d criteria, N=%d (%d evaluations), sampler=%s",
@@ -218,7 +268,7 @@ class SobolStudy:
                 names,
                 n_samples=self.n_samples,
                 second_order=self.second_order,
-                seed=self.seed,
+                seed=seed,
                 sampler=self.sampler,
                 num_resamples=self.num_resamples,
                 conf_level=self.conf_level,
@@ -229,7 +279,7 @@ class SobolStudy:
         # bounds, computed the same way for every model so that studies can
         # be compared. ``r2_fit`` is the R^2 of the fit that produced the
         # reported weights (None when the weights are declared).
-        sample_fit = self._sample_regression(adapter)
+        sample_fit = self._sample_regression(adapter, seed)
         declared = adapter.declared_weights()
         if declared is None:
             # No declared weights (bare callable): report the regression
@@ -258,6 +308,10 @@ class SobolStudy:
         # 5. Discrepancy diagnosis.
         diagnoses = classify(names, weights_arr, sobol.S1, sobol.ST, self.thresholds)
 
+        metadata = self._run_metadata(seed)
+        metadata["result_sha256"] = _result_digest(
+            views, sobol, point, r2_fit, float(sample_fit.r2), self.n_r2_samples, weights_source
+        )
         return StudyResult(
             views=views,
             sobol=sobol,
@@ -269,28 +323,62 @@ class SobolStudy:
             reference_point=point,
             n_r2_samples=self.n_r2_samples,
             adapter=adapter,
+            _metadata_json=json.dumps(metadata),
         )
 
     @staticmethod
     def _validate_n_r2_samples(n_r2_samples, n_criteria: int) -> int:
         minimum = n_criteria + 2
-        n_r2_samples = int(n_r2_samples)
-        if n_r2_samples < minimum:
-            raise ValueError(
-                f"n_r2_samples must be at least n_criteria + 2 = {minimum} so that the "
-                f"linear fit is not saturated, got {n_r2_samples}"
-            )
+        n_r2_samples = validate_integer(n_r2_samples, "n_r2_samples", minimum=minimum)
         return n_r2_samples
 
-    def _sample_regression(self, adapter) -> RegressionWeights:
+    def _sample_regression(self, adapter, seed) -> RegressionWeights:
         """Linear fit on a seeded uniform sample over the bounds."""
-        rng = np.random.default_rng(self.seed)
+        rng = np.random.default_rng(seed)
         X = rng.uniform(
             adapter.bounds[:, 0],
             adapter.bounds[:, 1],
             size=(self.n_r2_samples, adapter.n_criteria),
         )
         return regression_weights(X, adapter.scores(X), adapter.bounds)
+
+    def _run_metadata(self, seed) -> dict:
+        """Capture model inputs and environment at run time."""
+        adapter = self.adapter
+        grid = adapter.grid_lines()
+        return {
+            "model": {
+                "class": adapter.model_identity,
+                "higher_is_closer": adapter.higher_is_closer,
+                "input_weights": (
+                    None if getattr(adapter, "weights", None) is None else adapter.weights.tolist()
+                ),
+                "types": None if not hasattr(adapter, "types") else adapter.types.tolist(),
+                "grid_lines": None if grid is None else [line.tolist() for line in grid],
+                "definition": "Keep the model construction script with these results.",
+            },
+            "bounds": adapter.bounds.tolist(),
+            "esps": None if adapter.esps is None else adapter.esps.tolist(),
+            "sampling": {"seed": seed, "requested_seed": self.seed},
+            "local_weights": {"percent_step": self.local_percent_step, "include_upper": False},
+            "versions": {
+                "python": platform.python_version(),
+                **{
+                    name: version(name)
+                    for name in (
+                        "gcisens",
+                        "numpy",
+                        "pandas",
+                        "scipy",
+                        "scikit-learn",
+                        "SALib",
+                        "pymcdm",
+                        "matplotlib",
+                    )
+                },
+            },
+            "platform": platform.platform(),
+        }
 
 
 #: Display labels of the summary metrics, defined once; :attr:`StudyResult.metrics`
@@ -308,32 +396,21 @@ METRIC_LABELS = {
 }
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, frozen=True)
 class StudyResult:
-    """The outcome of a :class:`SobolStudy` run: a plain record of the
-    numbers, with reporting helpers.
+    """A study outcome with read-only numerical data and reporting methods.
 
-    The record holds:
-
-    - the views ``w``, ``w_loc`` (optional), ``S1`` and ``ST``;
-    - the Sobol' indices and the per-criterion diagnoses;
-    - the two R² values and the run settings;
-    - the validation, once :meth:`validate` has run.
-
-    Weights, ranks, correlations, metrics, tables and the summary are
-    derived from these fields. A record built by hand therefore renders
-    exactly like one produced by a study.
-
-    The model is not part of the numbers. :attr:`adapter` is an optional
-    handle. Only :meth:`validate` and :meth:`plot_surface` need it, because
-    they score new points. Every table, export and other plot works on a
-    record without it.
+    Tables, ranks, correlations and diagnoses use the same Sobol arrays.
+    Use ``result.weights.copy()`` or ``result.table()`` for editable data.
+    ``validate()`` explicitly attaches a label-validation result. It and
+    ``plot_surface()`` require the original model; other reports do not.
+    ``metadata()`` returns a detached JSON-compatible run description.
     """
 
     #: Ordered views: ``w``, ``w_loc`` (only with a reference point), ``S1``, ``ST``.
-    views: list[View]
+    views: tuple[View, ...]
     sobol: SobolIndices
-    diagnoses: list[CriterionDiagnosis]
+    diagnoses: tuple[CriterionDiagnosis, ...]
     #: R^2 of the fit behind the reported weights: the characteristic-object
     #: regression for COMET, the sample regression for a callable without
     #: weights, ``None`` for declared weights (SPOTIS).
@@ -356,24 +433,69 @@ class StudyResult:
     validation: ValidationResult | None = None
     #: The model handle. Needed only by :meth:`validate` and :meth:`plot_surface`.
     adapter: ModelAdapter | None = None
+    _metadata_json: str = field(default="{}", repr=False)
 
     def __post_init__(self):
         keys = [v.key for v in self.views]
-        if "w" not in keys or "S1" not in keys or "ST" not in keys:
+        if not {"w", "S1", "ST"}.issubset(keys):
             raise ValueError(f"views must include 'w', 'S1' and 'ST', got {keys}")
+        if len(set(keys)) != len(keys) or set(keys) - {"w", "w_loc", "S1", "ST"}:
+            raise ValueError("views must have unique keys from w, w_loc, S1 and ST")
         m = len(self.criteria_names)
-        for v in self.views:
-            if len(v.values) != m:
-                raise ValueError(f"view {v.key!r} has {len(v.values)} values for {m} criteria")
+        canonical = []
+        for view in self.views:
+            if len(view.values) != m:
+                raise ValueError(
+                    f"view {view.key!r} has {len(view.values)} values for {m} criteria"
+                )
+            if view.key in ("S1", "ST"):
+                values = getattr(self.sobol, view.key)
+                if not np.array_equal(view.values, values):
+                    raise ValueError(f"view {view.key} must match sobol.{view.key}")
+                view = View(view.key, view.label, values)
+                # The Sobol record is the sole source of these two arrays.
+                object.__setattr__(view, "values", values)
+            canonical.append(view)
+        object.__setattr__(self, "views", tuple(canonical))
         if len(self.diagnoses) != m:
             raise ValueError(f"{len(self.diagnoses)} diagnoses for {m} criteria")
+        if [d.criterion for d in self.diagnoses] != self.criteria_names:
+            raise ValueError("diagnoses must follow the criteria names in order")
+        # Recompute after a dataclasses.replace call as well as a new run.
+        object.__setattr__(
+            self,
+            "diagnoses",
+            tuple(
+                classify(
+                    self.criteria_names, self.weights, self.sobol.S1, self.sobol.ST, self.thresholds
+                )
+            ),
+        )
         if self.reference_point is not None:
-            self.reference_point = np.asarray(self.reference_point, dtype=float).ravel()
+            point = np.asarray(self.reference_point, dtype=float)
+            if point.shape != (m,) or not np.isfinite(point).all():
+                raise ValueError(f"reference_point must contain {m} finite values")
+            object.__setattr__(self, "reference_point", np.frombuffer(point.tobytes(), dtype=float))
+        # Validate the snapshot now; metadata() always returns a detached copy.
+        metadata = json.loads(self._metadata_json)
+        recorded = metadata.get("result_sha256")
+        if recorded is not None and recorded != _result_digest(
+            self.views,
+            self.sobol,
+            self.reference_point,
+            self.r2_fit,
+            self.r2_samples,
+            self.n_r2_samples,
+            self.weights_source,
+        ):
+            raise ValueError("Numerical data differ from the recorded run; run a new study")
+        if self.adapter is not None:
+            object.__setattr__(self, "adapter", self.adapter.snapshot())
 
     # ------------------------------------------------------------- accessors
     @property
     def criteria_names(self) -> list[str]:
-        return self.sobol.criteria_names
+        return list(self.sobol.criteria_names)
 
     def view(self, key: str) -> View | None:
         """The view with the given key (``w``, ``w_loc``, ``S1``, ``ST``) or ``None``."""
@@ -477,6 +599,47 @@ class StudyResult:
             self.criteria_names, self.weights, s.S1, s.ST, base or self.thresholds, **grid
         )
 
+    def metadata(self) -> dict:
+        """Return a JSON-compatible copy of the run settings and software versions.
+
+        CSV exports write this as ``{prefix}_metadata.json``. HTML reports
+        include the same values. This describes the run; retain the model
+        construction script and any input data to repeat it. Hand-built
+        records have null values for settings that were not recorded.
+        """
+        data = json.loads(self._metadata_json)
+        s = self.sobol
+        data.setdefault("model", None)
+        data.setdefault("bounds", None)
+        data.setdefault("esps", None)
+        data.setdefault("versions", None)
+        sampling = data.setdefault("sampling", {"seed": None, "requested_seed": None})
+        sampling.update(
+            {
+                "sampler": s.sampler,
+                "n_samples": s.n_samples,
+                "n_evaluations": s.n_evaluations,
+                "second_order": s.S2 is not None,
+                "num_resamples": s.num_resamples,
+                "conf_level": s.conf_level,
+            }
+        )
+        local = data.setdefault("local_weights", {"percent_step": None, "include_upper": None})
+        local["reference_point"] = (
+            None if self.reference_point is None else self.reference_point.tolist()
+        )
+        data.update(
+            {
+                "schema_version": 1,
+                "criteria_names": self.criteria_names,
+                "weights": self.weights.tolist(),
+                "weights_source": self.weights_source,
+                "thresholds": asdict(self.thresholds),
+                "n_r2_samples": self.n_r2_samples,
+            }
+        )
+        return data
+
     def summary(self) -> pd.Series:
         """Configuration-level metrics (cf. KES 2026, Table 5) followed by
         the run configuration.
@@ -491,6 +654,7 @@ class StudyResult:
         this value as ``n/a``.
         """
         s = self.sobol
+        metadata = self.metadata()
         data = {m.key: m.value for m in self.metrics}
         data.update(
             {
@@ -501,6 +665,8 @@ class StudyResult:
                 "num_resamples": s.num_resamples,
                 "conf_level": s.conf_level,
                 "weights_source": self.weights_source,
+                "seed": metadata["sampling"]["seed"],
+                "local_percent_step": metadata["local_weights"]["percent_step"],
             }
         )
         return pd.Series(data)
@@ -526,13 +692,30 @@ class StudyResult:
         adapter = self._require_adapter("validate()")
         if ascending is None:
             ascending = not adapter.higher_is_closer
-        if isinstance(X, pd.DataFrame) and all(name in X.columns for name in self.criteria_names):
-            X = X[self.criteria_names]
-        X = np.asarray(pd.DataFrame(X).values, dtype=float)
+        if isinstance(X, pd.DataFrame):
+            if not X.columns.is_unique:
+                raise ValueError("X column names must be unique")
+            missing = [name for name in self.criteria_names if name not in X.columns]
+            if missing:
+                raise ValueError(f"X is missing criteria columns: {missing}")
+            if isinstance(labels, pd.Series):
+                if not X.index.is_unique or not labels.index.is_unique:
+                    raise ValueError("X and labels indexes must be unique for label alignment")
+                if len(X) != len(labels) or not X.index.isin(labels.index).all():
+                    raise ValueError("labels index must contain exactly the X row labels")
+                labels = labels.reindex(X.index)
+            X = X[self.criteria_names].to_numpy(dtype=float)
+        else:
+            X = np.asarray(X, dtype=float)
+        if X.ndim != 2:
+            raise ValueError("X must be a 2-D matrix of alternatives")
         if X.shape[1] != adapter.n_criteria:
             raise ValueError(f"X must have {adapter.n_criteria} columns, got {X.shape[1]}")
+        if not np.isfinite(X).all():
+            raise ValueError("X must contain only finite values")
         scores = adapter.scores(X)
-        self.validation = validate_scores(scores, labels, top_k=top_k, ascending=ascending)
+        validation = validate_scores(scores, labels, top_k=top_k, ascending=ascending)
+        object.__setattr__(self, "validation", validation)
         return self.validation
 
     # ------------------------------------------------------------------- plots
@@ -596,7 +779,7 @@ class StudyResult:
         title: str = "Sensitivity Discrepancy Report",
         include_plots: bool = True,
     ) -> Path:
-        """Standalone dark-theme HTML report with tables, diagnosis and plots."""
+        """Standalone HTML report with settings, tables, diagnosis and plots."""
         from . import export
 
         return export.to_html(self, path, title=title, include_plots=include_plots)

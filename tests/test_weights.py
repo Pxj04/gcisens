@@ -120,3 +120,22 @@ def test_sweep_local_weights_can_include_upper_bound():
     )
 
     np.testing.assert_allclose(local, [0.5, 0.5])
+
+
+@pytest.mark.parametrize("step", [0, -0.01, np.nan, np.inf, True, 1, 1.1])
+def test_local_sweep_rejects_invalid_steps(step, linear_model):
+    score, bounds = linear_model
+    with pytest.raises(ValueError, match="local_percent_step"):
+        sweep_local_weights(score, [5, 5], bounds, percent_step=step)
+
+
+@pytest.mark.parametrize("point", [[np.nan, 5], [-1, 5], [5, 11]])
+def test_local_sweep_rejects_invalid_reference_point(point, linear_model):
+    score, bounds = linear_model
+    with pytest.raises(ValueError, match="reference point"):
+        sweep_local_weights(score, point, bounds)
+
+
+def test_local_sweep_rejects_nonfinite_model_scores():
+    with pytest.raises(ValueError, match="finite score"):
+        sweep_local_weights(lambda X: np.full(len(X), np.nan), [0.5], [[0, 1]])

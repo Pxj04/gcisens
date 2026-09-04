@@ -168,6 +168,44 @@ def test_only_the_adapter_modules_know_the_model_internals():
         assert not re.search(r"isinstance\([^)]*COMET", source)
         assert "META_ATTR" not in source
         assert "_gcisens_meta" not in source
-        assert "adapter.model" not in source
+        assert not re.search(r"adapter\.model\b", source)
         assert ".cvalues" not in source
         assert "expert_function" not in source
+
+
+def test_builder_and_adapter_copy_caller_arrays():
+    from gcisens import esp_spotis
+    from gcisens.adapters import make_adapter
+
+    bounds = BOUNDS.copy()
+    weights = np.array([0.6, 0.4])
+    types = np.array([1, -1])
+    esp = np.array([7.0, 2.0])
+    names = ["A", "B"]
+    model = esp_spotis(esp, bounds, weights, types, names)
+    adapter = make_adapter(model)
+    expected = adapter.scores([[5, 1]])
+    bounds[:] = 0
+    weights[:] = 0
+    types[:] = 0
+    esp[:] = 0
+    names[0] = "changed"
+    for copied in (adapter, make_adapter(model)):
+        np.testing.assert_array_equal(copied.bounds, BOUNDS)
+        np.testing.assert_array_equal(copied.weights, [0.6, 0.4])
+        np.testing.assert_array_equal(copied.esps, [[7, 2]])
+        assert copied.criteria_names == ["A", "B"]
+        np.testing.assert_array_equal(copied.scores([[5, 1]]), expected)
+
+
+def test_callable_adapter_copies_caller_arrays():
+    bounds = BOUNDS.copy()
+    weights = np.array([0.6, 0.4])
+    esps = np.array([[7.0, 2.0]])
+    adapter = CallableAdapter(lambda X: X[:, 0], bounds, weights=weights, esps=esps)
+    bounds[:] = 0
+    weights[:] = 0
+    esps[:] = 0
+    np.testing.assert_array_equal(adapter.bounds, BOUNDS)
+    np.testing.assert_array_equal(adapter.weights, [0.6, 0.4])
+    np.testing.assert_array_equal(adapter.esps, [[7, 2]])

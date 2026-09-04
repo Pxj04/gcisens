@@ -1,47 +1,57 @@
-# gcisens
+# gcisens terminology
 
-Variance-based sensitivity analysis of MCDA scoring models (ESP-COMET, ESP-SPOTIS), and the Sensitivity Discrepancy Report that compares what a model declares about its criteria with what the model actually does.
+Use this vocabulary in code, documentation and article text. See
+`CONTRIBUTING.md` for the module map and release procedure.
 
-## Language
+## Workflow
 
-### Criteria importance
+Users pass a pymcdm COMET or SPOTIS model to `SobolStudy(...).run()`. They
+inspect criterion weights and Sobol' indices with `result.table()` and save
+outputs through result methods. Builders are optional shortcuts. Keep helper
+records and adapters out of the main user workflow.
 
-**View**:
-One account of how important each criterion is: a value per criterion and the ranking those values induce. A study has an ordered set of views: w, w_loc (only with a reference point), S1 and ST.
-_Avoid_: ranking (a view induces one), column, series, perspective
+## Criterion importance
 
-**Declared weight (w)**:
-The importance a model reports to stakeholders: an input for SPOTIS, estimated by regression on characteristic objects for COMET.
-_Avoid_: global weight, nominal weight
+**Weight, w** is a declared input for SPOTIS and a regression estimate for
+COMET. Always state the source. Do not call COMET weights declared weights.
 
-**Local weight (w_loc)**:
-Criterion importance in the neighbourhood of a reference point, from a one-criterion range sweep.
+**Local weight, w_loc** comes from a conditional range sweep. Vary one
+criterion over its entire bounds and hold the other criteria at the reference
+point. This does not measure only a small neighbourhood of that point.
 
-**Reference point**:
-A point in the criteria space at which local weights are computed.
-_Avoid_: anchor, probe point
+**Reference point** fixes the other criteria during a local-weight sweep.
 
-**Sobol' index (S1, ST, S2)**:
-The first-order, total-order or pairwise-interaction share of score variance attributable to a criterion.
+**Sobol' indices, S1, ST and S2** describe first-order, total-order and pairwise
+interaction contributions to score variance. This implementation uses
+independent uniform inputs over the criterion bounds.
 
-**Rank**:
-A criterion's position within a view, 1 = most important. Exact ties share their average rank. The whole package has one rank definition.
-_Avoid_: ordinal rank, position
+**Rank** is a criterion's position by weight or index, with 1 most important.
+Exact ties share their average rank. These are criterion ranks, not ranks of
+alternatives.
 
-### Diagnosis
+**View** is a compatibility record for a criterion measure and its display
+settings. It is not needed to run a study.
 
-**Sensitivity Discrepancy Report**:
-A per-criterion category that compares the declared weight with the observed Sobol' indices: hidden influence, interaction dominance, moderate discrepancy or confirmed transparency.
-_Avoid_: diagnosis table, classification report
+## Diagnosis
 
-**Rank displacement**:
-The distance between a criterion's rank under w and under S1; a large displacement is one trigger of moderate discrepancy.
+The **Sensitivity Discrepancy Report** assigns one category per criterion
+from weights, S1 and ST. Rules use dimensionless thresholds and point estimates.
+Bootstrap confidence intervals are reported separately.
 
-### Models
+The retained category **confirmed transparency** means no discrepancy was
+found at the chosen thresholds. It is not proof of transparency.
 
-**Expected Solution Point (ESP)**:
-The alternative the decision maker considers ideal; ESP-COMET and ESP-SPOTIS score alternatives by closeness to it.
+**Rank displacement** is the distance between a criterion's weight rank and
+S1 rank. It is one trigger of moderate discrepancy.
 
-**Score orientation**:
-Whether a higher score means closer to the ESP (COMET preferences) or farther from it (SPOTIS distances).
-_Avoid_: ascending, lower-is-better
+## Models
+
+An **Expected Solution Point, ESP** is a point the decision maker considers
+ideal. ESP-COMET and ESP-SPOTIS use it to score alternatives.
+
+**Score orientation** states whether higher or lower scores mean closer to the
+ESP. COMET uses higher preferences; SPOTIS uses lower distances.
+
+A **custom scoring function** must return one finite score per row, give the
+same point the same score regardless of other rows, and be deterministic.
+Batch-dependent normalisation or refitting does not meet this contract.

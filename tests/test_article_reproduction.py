@@ -11,6 +11,7 @@ equals 0.9643 vs 1.0000 depends on float dust below any meaningful precision;
 the test accepts either split.
 """
 
+from hashlib import sha256
 from pathlib import Path
 
 import numpy as np
@@ -63,6 +64,10 @@ TABLE4 = np.array(
 
 @pytest.fixture(scope="module")
 def hr_bounds():
+    assert (
+        sha256(DATA.read_bytes()).hexdigest()
+        == "e9f55fbf0a5c058306225d131311e135379d82ad0c94c33738ec75b9a179db9c"
+    )
     df = pd.read_csv(DATA)
     assert df.shape[0] == 1470
     return np.array([[df[c].min(), df[c].max()] for c in CRITERIA], dtype=float)
@@ -70,7 +75,7 @@ def hr_bounds():
 
 def run_config(bounds, esps):
     model = esp_comet(esps=esps, bounds=bounds, criteria_names=CRITERIA)
-    return SobolStudy(model, n_samples=2048, second_order=True, seed=42).run(
+    return SobolStudy(model, n_samples=2048, second_order=True, seed=42, sampler="saltelli").run(
         reference_point=REFERENCE_EMPLOYEE
     )
 

@@ -7,6 +7,7 @@ writing one new adapter here and nothing else.
 
 from __future__ import annotations
 
+from copy import copy
 from dataclasses import dataclass
 from functools import cached_property
 
@@ -18,8 +19,8 @@ META_ATTR = "_gcisens_meta"
 
 def validate_bounds(bounds) -> np.ndarray:
     """Return criteria bounds after validating their shape and row order."""
-    bounds = np.asarray(bounds, dtype=float)
-    if bounds.ndim != 2 or bounds.shape[1] != 2:
+    bounds = np.array(bounds, dtype=float, copy=True)
+    if bounds.ndim != 2 or bounds.shape[1] != 2 or len(bounds) == 0:
         raise ValueError("bounds must have shape (m, 2) with [min, max] rows")
     invalid = np.flatnonzero(~np.isfinite(bounds).all(axis=1) | (bounds[:, 0] >= bounds[:, 1]))
     if len(invalid):
@@ -33,7 +34,7 @@ def validate_bounds(bounds) -> np.ndarray:
 
 def validate_weights(weights, n_criteria: int) -> np.ndarray:
     """Return declared weights after validating their shape and normalization."""
-    weights = np.asarray(weights, dtype=float)
+    weights = np.array(weights, dtype=float, copy=True)
     if weights.shape != (n_criteria,):
         raise ValueError("weights must be a 1-D array with one value per criterion")
     if (
@@ -46,19 +47,36 @@ def validate_weights(weights, n_criteria: int) -> np.ndarray:
 
 
 def validate_criteria_names(criteria_names, n_criteria: int):
-    """Reject a criteria-name list whose length does not match the model."""
-    if criteria_names is not None and len(criteria_names) != n_criteria:
+    """Return unique, non-empty names, with one name per criterion."""
+    if criteria_names is None:
+        return None
+    if isinstance(criteria_names, str):
+        raise ValueError("criteria_names must be a sequence of names, not a string")  # noqa: TRY004
+    if len(criteria_names) != n_criteria:
         raise ValueError(f"Got {len(criteria_names)} criteria names for {n_criteria} criteria")
-    return criteria_names
+    names = [str(name) for name in criteria_names]
+    if not all(name.strip() for name in names) or len(set(names)) != len(names):
+        raise ValueError("criteria_names must be non-empty and unique")
+    return names
+
+
+def validate_types(types, n_criteria: int) -> np.ndarray:
+    """Return one profit (+1) or cost (-1) type per criterion."""
+    types = np.array(types, dtype=float, copy=True)
+    if types.shape != (n_criteria,) or not np.isin(types, [-1, 1]).all():
+        raise ValueError("types must have one value per criterion, each 1 (profit) or -1 (cost)")
+    return types
 
 
 def validate_esps(esps, n_criteria: int) -> np.ndarray | None:
     """Return the ESPs as a ``(k, m)`` array, or ``None`` when there are none."""
     if esps is None:
         return None
-    esps = np.atleast_2d(np.asarray(esps, dtype=float))
-    if esps.ndim != 2 or esps.shape[1] != n_criteria:
+    esps = np.atleast_2d(np.array(esps, dtype=float, copy=True))
+    if esps.ndim != 2 or esps.shape[1] != n_criteria or len(esps) == 0:
         raise ValueError(f"esps must have shape (k, {n_criteria})")
+    if not np.isfinite(esps).all():
+        raise ValueError("esps must contain only finite values")
     return esps
 
 
@@ -86,6 +104,14 @@ class ModelMeta:
     weights: np.ndarray | None = None
     types: np.ndarray | None = None
     esps: np.ndarray | None = None
+
+    def __post_init__(self):
+        for name in ("bounds", "weights", "types", "esps"):
+            value = getattr(self, name)
+            if value is not None:
+                setattr(self, name, np.array(value, dtype=float, copy=True))
+        if self.criteria_names is not None:
+            self.criteria_names = list(self.criteria_names)
 
 
 class ModelAdapter:
@@ -120,14 +146,36 @@ class ModelAdapter:
         m = self.bounds.shape[0]
         if criteria_names is None:
             criteria_names = [f"C{i + 1}" for i in range(m)]
-        validate_criteria_names(criteria_names, m)
-        self.criteria_names = [str(c) for c in criteria_names]
+        self.criteria_names = validate_criteria_names(criteria_names, m)
         #: ESPs as a ``(k, m)`` array, or ``None`` when the model has none.
         self.esps = validate_esps(esps, m)
 
     @property
     def n_criteria(self) -> int:
         return self.bounds.shape[0]
+
+    @property
+    def model_identity(self) -> str:
+        """Qualified callable or class name for the run configuration."""
+        identity = self.model if hasattr(self.model, "__qualname__") else type(self.model)
+        return f"{identity.__module__}.{identity.__qualname__}"
+
+    def snapshot(self) -> ModelAdapter:
+        """Copy analysis settings while retaining the original scoring model.
+
+        The model itself may be large and is not copied. Do not modify it
+        after a study if the result will score new points.
+        """
+        snapshot = copy(self)
+        for name in ("bounds", "esps", "weights", "types", "model_bounds"):
+            value = getattr(self, name, None)
+            if value is not None:
+                array = np.asarray(value, dtype=float)
+                setattr(
+                    snapshot, name, np.frombuffer(array.tobytes(), dtype=float).reshape(array.shape)
+                )
+        snapshot.criteria_names = tuple(self.criteria_names)
+        return snapshot
 
     def grid_lines(self) -> list[np.ndarray] | None:
         """Per-criterion evaluation grid drawn on decision surfaces.
@@ -235,7 +283,7 @@ class SpotisAdapter(ModelAdapter):
             if model.esp is None:
                 raise ValueError("SPOTIS without an ESP needs criteria types (1 profit / -1 cost).")
             types = np.ones(self.n_criteria)
-        self.types = np.asarray(types, dtype=float)
+        self.types = validate_types(types, self.n_criteria)
 
     def scores(self, X):
         X = np.atleast_2d(np.asarray(X, dtype=float))
@@ -248,10 +296,12 @@ class SpotisAdapter(ModelAdapter):
 
 
 class CallableAdapter(ModelAdapter):
-    """Fallback adapter for any callable ``f(X) -> scores``.
+    """Adapter for a fixed, deterministic scoring function ``f(X) -> scores``.
 
-    Lets arbitrary scoring functions (other pymcdm methods wrapped in a lambda,
-    custom models) go through the same pipeline. Declared weights are optional;
+    Each row must receive one finite score, independent of the other rows.
+    Normalization and model fitting must be fixed before evaluation. A wrapper
+    around a method that normalizes each input batch does not meet this rule.
+    Declared weights are optional;
     without them the study reports regression weights fitted on a seeded
     uniform sample over the bounds (the sample behind ``r2_samples``), not on
     the Sobol' design.

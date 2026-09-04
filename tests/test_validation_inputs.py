@@ -252,3 +252,86 @@ def test_sobol_study_rejects_unknown_sampler_at_construction():
             n_samples=8,
             sampler="lhs",
         )
+
+
+@pytest.mark.parametrize("types", [[1], [0, 0], [1, np.nan], [[1, -1]]])
+def test_spotis_types_checked_in_builder_and_plain_model(types):
+    bounds = np.array([[0.0, 1.0], [0.0, 1.0]])
+    with pytest.raises(ValueError, match="types"):
+        esp_spotis([0.5, 0.5], bounds, types=types)
+    with pytest.raises(ValueError, match="types"):
+        make_adapter(SPOTIS(bounds), weights=[0.5, 0.5], types=types)
+
+
+@pytest.mark.parametrize("names", [["A", "A"], [1, "1"], ["", "B"], "AB"])
+def test_duplicate_or_empty_names_fail_before_building(names):
+    with pytest.raises(ValueError, match="criteria_names"):
+        esp_spotis([0.5, 0.5], [[0, 1], [0, 1]], criteria_names=names)
+    with pytest.raises(ValueError, match="criteria_names"):
+        sobol_analysis(lambda X: X[:, 0], [[0, 1], [0, 1]], names, n_samples=8)
+
+
+@pytest.mark.parametrize("builder", [esp_comet, esp_spotis])
+def test_builders_reject_nonfinite_esps(builder):
+    with pytest.raises(ValueError, match="finite"):
+        builder([np.nan, 0.5], [[0, 1], [0, 1]])
+
+
+@pytest.mark.parametrize("top_k", [[0], [-1], [1.5], [True], [], 1])
+def test_invalid_lift_cutoffs_are_rejected(top_k):
+    with pytest.raises(ValueError, match="top_k"):
+        validate_scores([0.1, 0.2], [False, True], top_k=top_k)
+
+
+@pytest.mark.parametrize("labels", [[0, 2], [0, np.nan], ["No", "Yes"], [0, np.inf]])
+def test_validation_requires_binary_labels(labels):
+    with pytest.raises(ValueError, match="binary"):
+        validate_scores([0.1, 0.2], labels, top_k=[1])
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+def test_validation_requires_finite_scores(value):
+    with pytest.raises(ValueError, match="finite"):
+        validate_scores([0.1, value], [0, 1], top_k=[1])
+
+
+def test_validation_result_owns_readonly_scores_and_labels():
+    from dataclasses import FrozenInstanceError
+
+    scores = np.array([0.1, 0.2, 0.3])
+    labels = np.array([False, False, True])
+    result = validate_scores(scores, labels, top_k=[1])
+    groups, lift = result.groups, result.lift
+    scores[:] = 0
+    labels[:] = False
+    np.testing.assert_array_equal(result.scores, [0.1, 0.2, 0.3])
+    np.testing.assert_array_equal(result.labels, [False, False, True])
+    for values in (result.scores, result.labels):
+        with pytest.raises(ValueError):
+            values[0] = 0
+        with pytest.raises(ValueError):
+            values.setflags(write=True)
+    with pytest.raises(FrozenInstanceError):
+        result.delta_mean = 0
+    pd.testing.assert_frame_equal(result.groups, groups)
+    pd.testing.assert_frame_equal(result.lift, lift)
+
+
+def test_validation_tables_are_detached_and_record_can_be_copied():
+    from copy import copy
+
+    from gcisens.validation import ValidationResult
+
+    result = validate_scores([0.1, 0.2, 0.3], [0, 0, 1], top_k=[1])
+    groups, lift = result.groups, result.lift
+    copied = ValidationResult(groups, lift, result.delta_mean, result.scores, result.labels)
+    groups.loc[0, "mean_score"] = -99
+    lift.loc[0, "lift"] = -99
+    returned_groups, returned_lift = copied.groups, copied.lift
+    returned_groups.loc[0, "mean_score"] = -99
+    returned_lift.loc[0, "lift"] = -99
+    pd.testing.assert_frame_equal(copied.groups, result.groups)
+    pd.testing.assert_frame_equal(copied.lift, result.lift)
+    shallow_copy = copy(copied)
+    pd.testing.assert_frame_equal(shallow_copy.groups, result.groups)
+    pd.testing.assert_frame_equal(shallow_copy.lift, result.lift)

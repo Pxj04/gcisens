@@ -8,60 +8,13 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build and verify distributions
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out the released source
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.x"
-
-      - name: Verify that the release tag matches the package version
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          python - <<'PY'
-          import os
-          import tomllib
-
-          with open("pyproject.toml", "rb") as file:
-              package_version = tomllib.load(file)["project"]["version"]
-
-          release_version = os.environ["RELEASE_TAG"].removeprefix("v")
-          if release_version != package_version:
-              raise SystemExit(
-                  f"Release tag {os.environ['RELEASE_TAG']!r} does not match "
-                  f"pyproject.toml version {package_version!r}."
-              )
-          PY
-
-      - name: Install build tools
-        run: python -m pip install --disable-pip-version-check build twine
-
-      - name: Build wheel and source distribution
-        run: python -m build
-
-      - name: Verify distribution metadata
-        run: python -m twine check dist/*
-
-      - name: Store distributions
-        uses: actions/upload-artifact@v5
-        with:
-          name: python-package-distributions
-          path: dist/
-          if-no-files-found: error
-          retention-days: 7
+  validate:
+    name: Validate and build the released source
+    uses: ./.github/workflows/ci.yml
 
   publish:
-    name: Publish distributions to PyPI
-    needs: build
+    name: Publish checked distributions to PyPI
+    needs: validate
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -70,7 +23,7 @@ jobs:
       id-token: write
 
     steps:
-      - name: Download distributions
+      - name: Download checked distributions
         uses: actions/download-artifact@v5
         with:
           name: python-package-distributions

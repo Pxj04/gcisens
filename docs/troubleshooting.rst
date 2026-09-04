@@ -1,9 +1,9 @@
 Troubleshooting
 ===============
 
-Every check in ``gcisens`` raises a ``ValueError`` (or a ``TypeError``) with
-the message in the first column, or emits a ``UserWarning``. The table gives
-the cause and the fix.
+Common input errors raise ``ValueError`` or ``TypeError``. Warnings identify
+conditions that need review. Messages below are excerpts; the full message
+also identifies the parameter or criterion.
 
 Building the study
 ------------------
@@ -25,6 +25,11 @@ Building the study
    * - ``weights must be non-negative and sum to 1``
      - Declared weights are on another scale.
      - Normalise them: ``w / w.sum()``.
+   * - Error about ``types``
+     - SPOTIS criterion types have the wrong shape or contain values other
+       than 1 and -1.
+     - Supply one type per criterion: 1 for profit, -1 for cost. Without an
+       explicit ESP, types are required.
    * - ``COMET models do not take weights/types``
      - COMET has no declared weights; the study estimates them by
        regression.
@@ -40,7 +45,7 @@ Building the study
        criteria``
      - A shape does not match the number of criteria in ``bounds``.
      - Give one ESP row and one name per criterion.
-   * - ``n_samples must be at least 2``; warning ``n_samples=N is not a
+   * - ``n_samples must be an integer`` / ``n_samples must be at least 2``; warning ``n_samples=N is not a
        power of two``
      - The Saltelli design needs ``N = 2**k`` for a balanced sample.
      - Use 256, 512, 1024, 2048, ...
@@ -74,11 +79,24 @@ Running and validating
      - Clip the data, or widen ``bounds`` when building the model.
    * - ``X must have m columns, got k``
      - The validation data has the wrong number of columns.
-     - Select the criteria columns. A DataFrame whose columns carry the
-       criteria names is reordered automatically.
+     - Select the criteria columns. A DataFrame must contain every criterion
+       name exactly once; valid named columns are reordered automatically.
    * - ``labels must contain at least one positive`` / ``negative``
      - The labels are all equal, so group differences and lift are undefined.
      - Check the label column and the cut-off.
+   * - Error about non-finite scores or zero variance
+     - The model returns NaN or infinity, or all sampled scores are equal.
+     - Fix the scoring function or choose bounds over which it varies.
+       A constant model has undefined Sobol' indices.
+   * - Error about missing or duplicate criterion names
+     - DataFrame columns cannot be matched to the study criteria.
+     - Use each study criterion name once. Arrays use positional order.
+   * - Error about the label index
+     - A pandas label Series has missing, extra or duplicate row labels.
+     - Use unique indexes with the same row labels. Validation aligns their order.
+   * - Error about ``top_k``
+     - A cut-off is not a positive integer.
+     - Use positive integers. Values above the row count use all rows.
    * - ``Run result.validate(X, labels) first``
      - ``plot_validation`` needs validation results.
      - Call ``result.validate(X, labels)`` before the plot.

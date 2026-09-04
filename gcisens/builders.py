@@ -17,6 +17,7 @@ from .adapters import (
     validate_bounds,
     validate_criteria_names,
     validate_esps,
+    validate_types,
     validate_weights,
 )
 from .weights import warn_large_grid
@@ -68,7 +69,9 @@ def esp_comet(
     bounds = validate_bounds(bounds)
     m = bounds.shape[0]
     esps = validate_esps(esps, m)
-    validate_criteria_names(criteria_names, m)
+    criteria_names = validate_criteria_names(criteria_names, m)
+    if esps is None:
+        raise ValueError("esps must contain at least one Expected Solution Point")
     if expert is None:
         expert = ESPExpert(esps=esps, bounds=bounds)
     if cvalues is None:
@@ -124,12 +127,13 @@ def esp_spotis(
     """
     bounds = validate_bounds(bounds)
     m = bounds.shape[0]
-    validate_criteria_names(criteria_names, m)
-    esp = np.asarray(esp, dtype=float).ravel()
+    criteria_names = validate_criteria_names(criteria_names, m)
+    esp = np.array(esp, dtype=float, copy=True)
     if esp.shape != (m,):
         raise ValueError(f"esp must have {m} values (one per criterion), got {esp.shape}")
+    validate_esps(esp, m)
     weights = np.full(m, 1.0 / m) if weights is None else validate_weights(weights, m)
-    types = np.ones(m) if types is None else np.asarray(types, dtype=float)
+    types = np.ones(m) if types is None else validate_types(types, m)
     model = SPOTIS(bounds, esp=esp)
     setattr(
         model,

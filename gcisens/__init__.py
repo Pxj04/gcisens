@@ -18,10 +18,12 @@ Quick start::
     result = SobolStudy(model, n_samples=2048, seed=42).run()
     result.table(); result.diagnosis(); result.to_latex()
 
-Users familiar with pymcdm can build models the pymcdm way — the relevant
-classes are re-exported 1:1 (same classes, not copies), so both styles mix
-freely and models stay compatible with the pymcdm ecosystem.
+Import COMET, SPOTIS and ESPExpert from pymcdm when using existing models.
+Older explicit imports of helper records and re-exported pymcdm classes remain
+available for compatibility. The primary interface is listed in __all__.
 """
+
+# ruff: noqa: F401
 
 from importlib.metadata import version as _package_version
 
@@ -47,36 +49,11 @@ from .validation import ValidationResult, validate_scores
 __version__ = _package_version("gcisens")
 
 __all__ = [
-    # workflow
     "SobolStudy",
     "StudyResult",
-    "View",
-    "Metric",
     "compare",
     "Comparison",
-    # builders
     "esp_comet",
     "esp_spotis",
-    # diagnosis
     "DiagnosisThresholds",
-    "Category",
-    "CATEGORIES",
-    "HIDDEN_INFLUENCE",
-    "INTERACTION_DOMINANCE",
-    "MODERATE_DISCREPANCY",
-    "CONFIRMED_TRANSPARENCY",
-    "sweep_thresholds",
-    # building blocks
-    "SobolIndices",
-    "sobol_analysis",
-    "ValidationResult",
-    "validate_scores",
-    # exports
-    "s2_to_latex",
-    "comparison_to_latex",
-    # pymcdm re-exports
-    "COMET",
-    "SPOTIS",
-    "ESPExpert",
-    "get_local_weights",
 ]

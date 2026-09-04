@@ -22,34 +22,37 @@ Assumptions and limitations
        index.
    * - Weights and ``S1`` scales
      - Weights and first-order indices live on different scales. For an
-       additive linear model ``S1`` grows with the square of the weight. The
+       additive linear model, each variance contribution is proportional to
+       the squared coefficient times the input variance. The
        ESP-SPOTIS demo shows ``w = 0.25`` next to ``S1 = 0.41`` for a model
-       that is perfectly transparent. Rank-based rules (rank displacement,
-       Spearman correlations) are robust to this; absolute thresholds on
-       ``ST - w`` are heuristics.
+       with no criterion interactions. Rank-based rules compare order rather
+       than magnitude; absolute thresholds on ``ST - w`` are heuristics.
    * - Threshold defaults
      - :class:`gcisens.DiagnosisThresholds` defaults come from one case study
-       (KES 2026) with scores in [0, 1] and seven criteria. Recalibrate them
-       for other score scales and criteria counts, and report a threshold
-       sweep (below) with every diagnosis.
+       with seven criteria, KES 2026. Check their suitability for another
+       domain, input distribution or criterion count, and report a threshold
+       sweep with the diagnosis. The thresholds compare dimensionless indices
+       and normalised weights. An affine change of score units with a nonzero
+       scale factor does not change Sobol' indices.
    * - COMET weights
-     - COMET takes no weights as input. Its declared weights (the ``w``
-       view) are regression estimates: ``gcisens`` fits a linear model on
+     - COMET takes no weights as input. Its weights in ``w``
+       are regression estimates: ``gcisens`` fits a linear model on
        the characteristic objects, drops the sign of the coefficients and
        normalises their absolute values. ``r2_fit`` reports the fit quality.
        A low ``r2_fit`` means that the linear summary explains little of the
        model.
    * - Negative indices
      - Small negative ``S1`` or ``ST - S1`` values are estimator noise, not
-       evidence of a negative effect. Treat values inside the confidence
-       half-width as zero.
+       evidence of a negative effect. Inspect the confidence interval before
+       interpreting a small effect.
    * - Confidence columns
      - ``S1_conf``, ``ST_conf`` and ``S2_conf`` are half-widths of bootstrap
        confidence intervals at ``conf_level`` (default 0.95) from
        ``num_resamples`` bootstrap draws (default 100). They are not standard
        errors.
    * - Reproducibility
-     - Use NumPy 2.3 or newer to reproduce the article values. pymcdm's
+     - Use the Python 3.11 environment in ``requirements-repro.txt``
+       to reproduce the article values. pymcdm's
        ``ESPExpert`` detects distance ties with exact float equality, and
        NumPy 2.3 changed float reduction. Older NumPy versions give multi-ESP
        weights that differ by up to 0.0011 and a different ``r2_fit``.
@@ -65,12 +68,31 @@ Assumptions and limitations
        Reduce the number of criteria or ESPs, or pass smaller ``cvalues``,
        when the warning appears.
 
+Scoring and diagnosis contracts
+-------------------------------
+
+A model must define a fixed, deterministic function of one criterion vector.
+Its score for that vector must not depend on other rows in the input matrix.
+Each evaluated row must produce one finite score. A constant output has zero
+variance, so its Sobol' indices are undefined and the study raises an error.
+See :doc:`advanced` before passing a custom callable.
+
+Local weights use a conditional range sweep. Each criterion varies over its
+full bounds while the other criteria stay at the reference point. They do not
+measure only a small neighbourhood around that point.
+
+The discrepancy rules use point estimates and do not use their bootstrap
+confidence intervals. The retained category name ``confirmed transparency``
+means only that no rule found a discrepancy at the selected thresholds. It is
+not proof that the model is transparent. Inspect uncertainty, threshold
+sensitivity and sample-size stability when interpreting a result.
+
 Threshold sensitivity: a worked example
 ---------------------------------------
 
 The categories of the report depend on ``hidden_st_excess`` (how much
 ``ST`` must exceed a near-zero weight) and ``interaction_ratio`` (which share
-of ``ST`` must come from interactions). :func:`gcisens.sweep_thresholds`
+of ``ST`` must come from interactions). :meth:`gcisens.StudyResult.sweep_thresholds`
 re-classifies the criteria for every combination of values, so the stability
 of a diagnosis can be reported next to the diagnosis itself.
 
@@ -79,7 +101,9 @@ The example uses the ESP1+ESP2 configuration of the KES 2026 case study
 
 .. code-block:: python
 
-   result = SobolStudy(model, n_samples=2048, seed=42).run()
+   result = SobolStudy(
+       model, n_samples=2048, sampler="saltelli", seed=42,
+   ).run()
    sweep = result.sweep_thresholds(
        hidden_st_excess=[0.01, 0.03, 0.05],
        interaction_ratio=[0.2, 0.3, 0.4],

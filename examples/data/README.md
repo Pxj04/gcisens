@@ -12,3 +12,15 @@ The examples and the article-reproduction tests read seven numeric columns (`Age
 
 The ODbL licence of the database applies to the data file only; the code of
 `gcisens` stays under the MIT licence.
+
+## File identity
+
+The SHA-256 checksum of the CSV bytes in this repository is:
+
+```text
+e9f55fbf0a5c058306225d131311e135379d82ad0c94c33738ec75b9a179db9c
+```
+
+The article regression tests check this value before reading the data. Keep the
+file unchanged for reproduction, including its line endings. Record a new
+checksum and review the numerical results if you replace the dataset.

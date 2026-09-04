@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -13,53 +17,113 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
-        run: pip install -e ".[dev]"
-      - name: Lint
-        run: |
-          ruff check gcisens tests examples
-          ruff format --check gcisens tests examples
-      - name: Fast tests
-        run: pytest -m "not slow" -q
-      - name: Article reproduction (regression tests)
-        run: pytest -m slow -q
-      - name: Coverage
+        run: python -m pip install -e ".[dev]"
+      - name: Lint and format
         if: matrix.python-version == '3.11'
-        run: pytest --cov=gcisens --cov-report=term-missing
+        run: |
+          ruff check gcisens tests examples scripts
+          ruff format --check gcisens tests examples scripts
+      - name: All tests with coverage
+        if: matrix.python-version == '3.11'
+        run: pytest --cov=gcisens --cov-report=term-missing -q
+      - name: All tests
+        if: matrix.python-version != '3.11'
+        run: pytest -q
 
   min-versions:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install minimum versions
         run: |
-          pip install pytest \
-            "numpy==2.3.*" \
+          python -m pip install pytest \
+            "numpy==2.3.0" \
             "pandas==2.2.2" \
             "scipy==1.15.0" \
             "scikit-learn==1.4.2" \
             "SALib==1.5.1" \
             "pymcdm==1.4.0" \
             "matplotlib==3.8.4"
-          pip install --no-deps -e .
-      - name: Test
+          python -m pip install --no-deps -e .
+          python -m pip check
+      - name: All tests
         run: pytest -q
+
+  reproduction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.15"
+      - name: Install the exact article environment
+        run: |
+          python -m pip install -r requirements-repro.txt
+          python -m pip install --no-deps -e .
+          python -m pip check
+      - name: Article regression tests
+        run: pytest -m slow -q
 
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install
-        run: pip install -e ".[docs]"
+        run: python -m pip install -e ".[docs]"
       - name: Build documentation
-        run: python -m sphinx -b html -W docs _build/html
+        run: python -m sphinx -b html -W --keep-going docs _build/html
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Check release metadata
+        run: python scripts/check_release.py
+      - name: Check publication tag and changelog
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: python scripts/check_release.py --tag "$RELEASE_TAG"
+      - name: Build and check distributions
+        run: |
+          python -m pip install build twine
+          python -m build
+          python -m twine check dist/*
+      - name: Test the installed wheel outside the source tree
+        run: python scripts/check_wheel.py dist/*.whl
+      - name: Store checked distributions
+        uses: actions/upload-artifact@v5
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

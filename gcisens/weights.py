@@ -13,9 +13,12 @@ import itertools
 import math
 import warnings
 from dataclasses import dataclass
+from numbers import Real
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
+
+from .adapters import validate_bounds
 
 
 @dataclass
@@ -99,6 +102,18 @@ def grid_regression_weights(score_fn, grid_lines, bounds: np.ndarray) -> Regress
     return regression_weights(grid, np.asarray(score_fn(grid)).ravel(), bounds)
 
 
+def validate_percent_step(percent_step) -> float:
+    """Require a finite fraction that samples at least two points per criterion."""
+    if (
+        isinstance(percent_step, (bool, np.bool_))
+        or not isinstance(percent_step, Real)
+        or not np.isfinite(percent_step)
+        or not 0 < percent_step < 1
+    ):
+        raise ValueError("local_percent_step must be a finite number in (0, 1)")
+    return float(percent_step)
+
+
 def sweep_local_weights(
     score_fn,
     point,
@@ -115,10 +130,16 @@ def sweep_local_weights(
     Set ``include_upper=True`` to evaluate both bounds. This implementation
     works for any scoring function, not only COMET.
     """
-    point = np.asarray(point, dtype=float).ravel()
+    bounds = validate_bounds(bounds)
+    percent_step = validate_percent_step(percent_step)
+    point = np.asarray(point, dtype=float)
     m = bounds.shape[0]
     if point.shape != (m,):
         raise ValueError(f"reference point must have {m} values, got {point.shape}")
+    if not np.isfinite(point).all():
+        raise ValueError("reference point must contain only finite values")
+    if np.any((point < bounds[:, 0]) | (point > bounds[:, 1])):
+        raise ValueError("reference point must be within the criteria bounds")
     ranges = np.zeros(m)
     for i in range(m):
         lo, hi = bounds[i]
@@ -129,7 +150,9 @@ def sweep_local_weights(
             swept = np.arange(lo, hi, step)
         candidates = np.tile(point, (len(swept), 1))
         candidates[:, i] = swept
-        scores = score_fn(candidates)
+        scores = np.asarray(score_fn(candidates), dtype=float).ravel()
+        if scores.shape != (len(candidates),) or not np.isfinite(scores).all():
+            raise ValueError("score_fn must return one finite score per candidate")
         ranges[i] = np.max(scores) - np.min(scores)
     total = ranges.sum()
     return ranges / total if total > 0 else np.full(m, 1 / m)

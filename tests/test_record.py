@@ -134,9 +134,9 @@ def test_html_badges_use_the_category_colours(tmp_path, record):
         assert diagnosis.category.label in text
 
 
-def test_record_types_are_public():
+def test_compatibility_types_remain_explicitly_importable():
     import gcisens
+    from gcisens import Category, Metric, View
 
-    assert "Metric" in gcisens.__all__
-    assert "Category" in gcisens.__all__
+    assert all(callable(cls) for cls in (Category, Metric, View))
     assert gcisens.Category is type(HIDDEN_INFLUENCE)

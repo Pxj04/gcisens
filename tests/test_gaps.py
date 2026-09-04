@@ -90,8 +90,10 @@ def test_sampler_is_validated_at_construction_not_at_run():
 
 # ------------------------------------------------------ dataclass equality
 def test_records_holding_arrays_compare_by_identity(record):
+    from copy import copy
+
     for value in (record.sobol, record.validation, record):
-        same, copied = value, replace(value)
+        same, copied = value, copy(value)
         assert value == same
         assert value != copied  # a field-wise copy, not the same object
     assert {record.sobol, record.validation, record}  # hashable
@@ -147,4 +149,4 @@ def test_study_result_sweeps_its_own_views(record):
 
     assert list(table.columns) == ["hidden_st_excess", *record.criteria_names]
     assert list(table.loc[0, record.criteria_names]) == [d.category for d in record.diagnoses]
-    assert "sweep_thresholds" in gcisens.__all__
+    assert callable(gcisens.sweep_thresholds)

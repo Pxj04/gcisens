@@ -21,6 +21,7 @@ Start here
    about
    example
    methodology
+   advanced
    troubleshooting
    references
    api

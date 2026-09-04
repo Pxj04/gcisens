@@ -97,19 +97,15 @@ def test_study_reports_bootstrap_configuration(linear_model):
     assert result.summary()["conf_level"] == 0.9
 
 
-def test_study_s2_table_uses_diagnosis_thresholds(linear_model):
-    score, bounds = linear_model
+def test_study_s2_table_uses_diagnosis_thresholds(record):
+    from dataclasses import replace
+
     thresholds = gcisens.DiagnosisThresholds(s2_significance_factor=2.0)
-    result = SobolStudy(
-        score,
-        bounds=bounds,
-        weights=np.array([0.7, 0.3]),
-        thresholds=thresholds,
-        n_samples=64,
-        seed=0,
-    ).run()
-    result.sobol.S2[0, 1] = 0.03
-    result.sobol.S2_conf[0, 1] = 0.02
+    s2, conf = record.sobol.S2.copy(), record.sobol.S2_conf.copy()
+    s2[0, 1], conf[0, 1] = 0.03, 0.02
+    result = replace(
+        record, sobol=replace(record.sobol, S2=s2, S2_conf=conf), thresholds=thresholds
+    )
 
     assert result.sobol.s2_pairs().loc[0, "significant"]
     assert not result.s2_table().loc[0, "significant"]

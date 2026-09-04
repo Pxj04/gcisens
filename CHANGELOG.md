@@ -5,6 +5,77 @@ This file records notable changes to the project. The format follows
 
 ## [Unreleased]
 
+These changes include a smaller wildcard-import interface and read-only result
+records. Prepare them as a minor release; the published 0.1.3 tag is unchanged.
+
+### Fixed
+
+- Reject constant or non-finite scores and non-finite Sobol indices before
+  diagnosis. Keep finite negative estimates, which can arise from sampling error.
+- Make bootstrap intervals reproducible with `seed=0` on SALib 1.5.
+- Require valid sample counts, bootstrap settings, ESPs, criteria names, SPOTIS
+  types, binary labels and positive integer `top_k`. Reject local steps outside
+  `(0, 1)` and reference points outside the domain. Large `top_k` remains capped.
+- Select DataFrame criteria by unique names and reject missing names. Align a
+  labels Series by matching unique row indexes; array labels remain positional.
+- Protect numerical results, thresholds and validation data from mutation.
+  Tables and ranks are detached copies. S1/ST views share the canonical Sobol
+  arrays. Rebuilding a manual result recalculates its diagnosis; changing the
+  numbers of a recorded run requires a new study so its provenance stays valid.
+- Snapshot adapter settings for later validation and surface plots. The original
+  model remains attached and must not be modified after analysis.
+- Remove stale optional CSV files when exporting a result without S2 or label
+  validation under the same prefix. Keep unrelated files and other prefixes.
+- Return an empty pairwise table for one criterion.
+
+### Added
+
+- `result.metadata()` and `{prefix}_metadata.json` with model inputs, sampling
+  settings, actual seed, thresholds, local-weight settings and software versions.
+  HTML contains the same JSON. An omitted seed is generated and recorded so the
+  full study can be repeated. Keep the model construction script with the files.
+- An exact article environment in `requirements-repro.txt`, dataset checksum
+  tests, and `reproduction.json` from the article script with input/source hashes
+  and each configuration's metadata.
+- Shared validation for CI and publication, including minimum dependencies,
+  article reproduction, release metadata, and a numerical wheel test outside the
+  checkout. Publication uses the checked distributions after all jobs pass.
+- A contributor map from each change to its files and checks, plus release and
+  archive instructions. A small synthetic example is in `examples/quickstart.py`.
+
+### Changed
+
+- Keep the main documented API to `SobolStudy`, `StudyResult`, `compare`,
+  `Comparison`, `esp_comet`, `esp_spotis` and `DiagnosisThresholds`. These are now
+  the symbols in `__all__`. Existing explicit imports of helper records and
+  pymcdm re-exports still work; import pymcdm classes directly in new code.
+- Use a plain light HTML report and state the source of the weights. Explain
+  that `confirmed transparency` means no discrepancy under the selected rules,
+  not proof of transparency. Category codes and numerical rules are unchanged.
+- Describe custom callables as deterministic, row-independent scoring functions.
+  Clarify COMET regression weights, full-domain conditional local sweeps and
+  dimensionless diagnosis thresholds.
+- Keep `saltelli` as the compatibility default and select it explicitly in article
+  scripts/tests. New examples select `sobol`. Import the legacy sampler lazily.
+- Cite the software while the SoftwareX article is unpublished.
+
+### Migration
+
+Use explicit imports instead of relying on helper symbols from wildcard imports:
+
+```python
+from gcisens import SobolStudy
+from pymcdm.methods import COMET, SPOTIS
+from pymcdm.methods.comet_tools import ESPExpert
+```
+
+Use `result.weights.copy()` or `result.table()` to edit values for a separate
+analysis. Do not modify a result in place. Run another study to change its model
+or numerical settings. Use `result.sweep_thresholds(...)` to compare diagnosis
+thresholds. `ValidationResult` tables return copies; use `copy.copy` rather than
+`dataclasses.replace` to copy that compatibility record. `SobolIndices.criteria_names`
+and result views/diagnoses are tuples; `result.criteria_names` returns a list copy.
+
 ## [0.1.3] - 2026-09-02
 
 ### Added

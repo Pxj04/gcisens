@@ -1,98 +1,124 @@
-Example
-=======
+Quick start
+===========
 
-This example shows the main ``gcisens`` workflow: create an ESP-COMET model,
-run a Sobol' sensitivity study, inspect the criterion-level results and draw a
-comparison plot.
+Use ``SobolStudy(model, ...).run()`` to compare a model's criterion weights
+with Sobol' indices. You can pass a pymcdm model directly.
 
-Complete example
-----------------
+A complete synthetic example
+----------------------------
+
+This example needs no external data. It builds a small ESP-COMET model and
+saves its results. Bounds, ESP coordinates and names use the same criterion
+order.
+
+.. literalinclude:: ../examples/quickstart.py
+   :language: python
+   :start-at: from pathlib import Path
+
+Run it from the repository root after installing the package:
+
+.. code-block:: bash
+
+   python examples/quickstart.py
+
+The script writes tables, run metadata and a plot to
+``examples/output/quickstart/``. For a single-call model constructor, use
+:func:`gcisens.esp_comet`. The builder returns a pymcdm COMET object and stores
+the study settings with it.
+
+Use an existing SPOTIS model
+----------------------------
+
+SPOTIS takes declared weights and criterion types. Pass these to the study
+along with your existing model:
 
 .. code-block:: python
 
-   import matplotlib.pyplot as plt
    import numpy as np
+   from pymcdm.methods import SPOTIS
+   from gcisens import SobolStudy
 
-   from gcisens import SobolStudy, esp_comet
-
-   bounds = np.array([
-       [18, 60],
-       [1, 29],
-       [1009, 19999],
-   ], dtype=float)
-
-   model = esp_comet(
-       esps=[[25, 25, 2000]],
-       bounds=bounds,
-       criteria_names=["Age", "Distance", "Income"],
-   )
-
+   bounds = np.array([[0, 10], [0, 100]], dtype=float)
+   weights = np.array([0.4, 0.6])
+   types = np.array([-1, 1])
+   model = SPOTIS(bounds, esp=np.array([3, 80]))
    result = SobolStudy(
        model,
+       weights=weights,
+       types=types,
+       criteria_names=["Cost", "Quality"],
        n_samples=2048,
+       sampler="sobol",
        seed=42,
    ).run()
-
    print(result.table())
 
-   result.plot_indices()
-   plt.show()
+:func:`gcisens.esp_spotis` stores weights and types so that you can omit them
+from ``SobolStudy``. It still returns a native SPOTIS object. To score data
+directly with either form, call ``model(X, weights, types)``. The builder does
+not change the pymcdm scoring interface. Lower SPOTIS scores mean closer to
+the ESP. Study validation accounts for this orientation.
 
-Model definition
-----------------
+Choose the sample size
+----------------------
 
-``bounds`` defines the analysed range of every criterion. Each row contains
-the minimum and maximum value for one criterion and must follow the same order
-as ``criteria_names``.
+``n_samples`` is the base sample size, not the total number of model
+evaluations. Use a power of two, such as 512 or 2048. Increase it to check
+whether estimates and confidence intervals are stable enough for your study.
+Use explicit ``sampler="sobol", seed=42`` for new studies.
 
-``esps`` contains the Expected Solution Point used to construct the ESP-COMET
-model. In this example, the preferred point is an age of 25, a distance of 25
-and an income of 2000. Multiple Expected Solution Points can be supplied as
-additional rows.
+The default remains ``"saltelli"`` for compatibility. It produces a
+deterministic sample design. ``seed`` controls bootstrap confidence intervals,
+the scrambled ``"sobol"`` sample design and the sample used for ``r2_samples``.
+If ``seed=None``, the study generates a seed and records it in
+``result.metadata()["sampling"]["seed"]``. Pass that recorded value to repeat
+the run. Reproducibility also depends on the model, data and software versions.
 
-Running the study
------------------
-
-:class:`gcisens.SobolStudy` evaluates the model across the specified criterion
-ranges and estimates Sobol' sensitivity indices. ``n_samples`` controls the
-base sample size: larger values generally provide more stable estimates but
-require more model evaluations. The default ``"saltelli"`` sampler is
-deterministic, so the indices are reproducible without a seed. ``seed`` fixes
-the bootstrap confidence intervals, the ``"sobol"`` sampler and the uniform
-sample behind ``r2_samples``.
-
-Reading the table
------------------
+Read the table
+--------------
 
 :meth:`gcisens.StudyResult.table` returns a pandas ``DataFrame`` with one row
-per criterion. Its key columns are:
+per criterion.
 
 ``w``
-   The criterion importance estimated from the model.
+   Regression-estimated importance for COMET, declared weights for SPOTIS.
+   ``result.weights_source`` states the source.
 
 ``S1``
-   The part of output variance explained by the criterion on its own.
+   The share of score variance due to the criterion alone.
 
 ``ST``
-   The criterion's total influence, including its interactions with other
-   criteria.
+   Total influence, including interactions with other criteria.
 
 ``ST_minus_S1``
-   The difference between total and first-order influence. A larger difference
-   indicates a stronger contribution through interactions.
+   The part of total influence due to interactions.
 
-The remaining columns provide confidence estimates, rankings and the
-diagnostic category assigned to each criterion.
+The remaining columns contain bootstrap confidence half-widths, criterion
+ranks and diagnosis categories. Rank 1 means most important. These ranks do
+not order the alternatives in a dataset.
 
-Plotting the result
--------------------
+The diagnosis uses heuristic thresholds. Its retained ``confirmed
+transparency`` label means that the rules found no discrepancy at those
+thresholds. Read :doc:`methodology` for the assumptions and limits.
 
-:meth:`gcisens.StudyResult.plot_indices` displays ``w``, ``S1`` and ``ST``
-next to each other for every criterion. This makes it easier to compare the
-model's criterion importance with the influence measured by the sensitivity
-analysis. The method returns a Matplotlib ``Axes`` object, so the figure can be
-customised using standard Matplotlib functions.
+Result arrays are read-only so that weights, ranks and diagnosis stay
+consistent. Use ``result.weights.copy()`` for an editable array, or change the
+study inputs and run a new study. Tables returned by result methods can be
+edited for presentation. ``result.validate(...)`` explicitly adds a validation
+result for later plots and exports.
 
-ESP-SPOTIS models and custom Python scoring functions can be analysed through
-the same :class:`gcisens.SobolStudy` interface. Their constructors and the
-remaining result methods are listed in the :doc:`api`.
+Save and inspect
+----------------
+
+``result.plot_indices()`` returns a Matplotlib ``Axes``. Use standard
+Matplotlib methods to change labels or save the figure.
+
+``result.to_csv(directory)`` writes tables and ``results_metadata.json``.
+``result.metadata()`` returns the same JSON-compatible run record. It includes
+model information, bounds, names, ESPs, weights and types when available,
+sampling and bootstrap settings, thresholds, local-weight settings and
+software versions. ``result.to_html(path)`` also includes this record.
+
+Keep the model script and data with the outputs. Metadata records the run
+configuration; it cannot restore an arbitrary Python model. See
+:doc:`advanced` for reporting and the article output map.

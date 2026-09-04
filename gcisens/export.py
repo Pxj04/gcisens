@@ -84,6 +84,9 @@ def to_csv(result, directory, prefix: str = "results") -> list[Path]:
     )
     summary_values.to_csv(summary, header=["value"])
     written.append(summary)
+    metadata = directory / f"{prefix}_metadata.json"
+    _write(metadata, json.dumps(result.metadata(), indent=2, allow_nan=False) + "\n")
+    written.append(metadata)
 
     if result.validation is not None:
         val = directory / f"{prefix}_validation.csv"
@@ -92,6 +95,15 @@ def to_csv(result, directory, prefix: str = "results") -> list[Path]:
         lift = directory / f"{prefix}_lift.csv"
         result.validation.lift.to_csv(lift, index=False)
         written.append(lift)
+
+    # A repeated export must not leave optional tables from an older run.
+    obsolete = []
+    if result.sobol.S2 is None:
+        obsolete.extend(("s2.csv", "s2_matrix.csv"))
+    if result.validation is None:
+        obsolete.extend(("validation.csv", "lift.csv"))
+    for suffix in obsolete:
+        (directory / f"{prefix}_{suffix}").unlink(missing_ok=True)
 
     return written
 
@@ -198,24 +210,17 @@ def comparison_to_latex(comparison, path=None, caption=None, label=None) -> str:
 
 # ------------------------------------------------------------------------ HTML
 _HTML_CSS = """
-:root { --bg:#0d0d0d; --fg:#d8d8d8; --dim:#8a8a8a; --accent:#7ec8e3;
-        --accent2:#a8d8a8; --line:#2a2a2a; --code:#161616; }
-* { box-sizing: border-box; }
-body { background:var(--bg); color:var(--fg); max-width:900px; margin:0 auto;
-       padding:2.5rem 1.5rem 5rem;
-       font:15px/1.6 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-h1 { font-size:1.5rem; border-bottom:1px solid var(--line); padding-bottom:.5rem; }
-h2 { font-size:1.15rem; color:var(--accent); margin-top:2.5rem;
-     border-bottom:1px solid var(--line); padding-bottom:.35rem; }
-table { border-collapse:collapse; width:100%; margin:1rem 0; font-size:.9em; }
-th,td { border:1px solid var(--line); padding:.45rem .65rem; text-align:right; }
-th { background:var(--code); color:var(--accent2); }
-td:first-child, th:first-child { text-align:left; }
-.dim { color:var(--dim); }
-.cat { display:inline-block; padding:.05em .55em; border-radius:10px;
-       font-size:.85em; color:#0d0d0d; font-weight:600; }
-img { max-width:100%; margin:.5rem 0 1rem; border:1px solid var(--line);
-      border-radius:8px; }
+body { color:#222; background:white; max-width:1000px; margin:2rem auto;
+       padding:0 1rem; font:16px/1.5 system-ui,sans-serif; }
+table { border-collapse:collapse; margin:1rem 0; width:100%; font-size:.9em; }
+th,td { border:1px solid #ccc; padding:.4rem; text-align:right; }
+th { background:#f3f3f3; }
+td:first-child,th:first-child { text-align:left; }
+.dim { color:#555; }
+.cat { padding:.15rem .35rem; color:#222; }
+img { max-width:100%; height:auto; }
+pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#f3f3f3; padding:1rem; }
+@media print { body { max-width:none; margin:0; } }
 """
 
 
@@ -246,7 +251,7 @@ def to_html(
     title: str = "Sensitivity Discrepancy Report",
     include_plots: bool = True,
 ) -> Path:
-    """Standalone dark-theme HTML report: summary, tables, diagnosis, plots."""
+    """Standalone HTML report: settings, tables, diagnosis and plots."""
     parts = [
         "<!DOCTYPE html><html><head><meta charset='utf-8'>",
         f"<title>{html.escape(title)}</title>",
@@ -254,6 +259,17 @@ def to_html(
         f"<h1>{html.escape(title)}</h1>",
     ]
 
+    metadata_json = json.dumps(result.metadata(), indent=2, allow_nan=False)
+    # Escape markup characters while keeping valid JSON inside the script element.
+    embedded_json = (
+        metadata_json.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    )
+    parts.append(f'<script type="application/json" id="gcisens-metadata">{embedded_json}</script>')
+    parts.append(
+        "<details><summary>Run configuration</summary><pre>"
+        + html.escape(metadata_json)
+        + "</pre></details>"
+    )
     summary = result.summary()
     parts.append("<h2>Configuration summary</h2><table><tbody>")
     for key, value in summary.items():
@@ -262,9 +278,15 @@ def to_html(
     parts.append("</tbody></table>")
 
     parts.append("<h2>Weights and Sobol' indices</h2>")
+    parts.append("<p>Weight source: " + html.escape(result.weights_source) + ".</p>")
     parts.append(_df_to_html(result.table()))
 
     parts.append("<h2>Discrepancy diagnosis</h2>")
+    parts.append(
+        "<p>Categories use the selected thresholds. Confirmed transparency means "
+        "no discrepancy was detected by these rules; it is not proof of transparency. "
+        "The category rules do not use the Sobol confidence intervals.</p>"
+    )
     parts.append(
         "<table><thead><tr><th>Criterion</th><th>Category</th><th>Detail</th></tr></thead><tbody>"
     )

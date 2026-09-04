@@ -115,7 +115,35 @@ def test_constant_view_correlation_is_shown_as_not_available(tmp_path, record):
 
 
 def test_latex_exports_are_available_through_public_api(tmp_path, record):
-    assert "s2_to_latex" in gcisens.__all__
-    assert "comparison_to_latex" in gcisens.__all__
+    assert callable(gcisens.s2_to_latex)
+    assert callable(gcisens.comparison_to_latex)
     assert record.s2_to_latex(tmp_path / "s2.tex") == gcisens.s2_to_latex(record)
     assert (tmp_path / "s2.tex").exists()
+
+
+@pytest.mark.parametrize("keep_s2,keep_validation", [(False, True), (True, False), (False, False)])
+def test_csv_reexport_removes_only_obsolete_optional_files(
+    tmp_path, record, keep_s2, keep_validation
+):
+    record.to_csv(tmp_path, prefix="audit")
+    record.to_csv(tmp_path, prefix="other")
+    unrelated = tmp_path / "audit_notes.csv"
+    unrelated.write_text("Keep this file.\n")
+    updated = replace(
+        record,
+        sobol=record.sobol if keep_s2 else replace(record.sobol, S2=None, S2_conf=None),
+        validation=record.validation if keep_validation else None,
+    )
+
+    written = updated.to_csv(tmp_path, prefix="audit")
+
+    for suffix in ("s2.csv", "s2_matrix.csv"):
+        assert (tmp_path / f"audit_{suffix}").exists() == keep_s2
+        assert (tmp_path / f"other_{suffix}").exists()
+    for suffix in ("validation.csv", "lift.csv"):
+        assert (tmp_path / f"audit_{suffix}").exists() == keep_validation
+        assert (tmp_path / f"other_{suffix}").exists()
+    assert unrelated.read_text() == "Keep this file.\n"
+    assert all(path.exists() for path in written)
+    metadata = json.loads((tmp_path / "audit_metadata.json").read_text())
+    assert metadata["sampling"]["second_order"] == keep_s2
