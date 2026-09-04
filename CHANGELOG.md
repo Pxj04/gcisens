@@ -39,7 +39,6 @@ This file records notable changes to the project. The format follows
 - Document `local_percent_step` and recommend the `sobol` sampler for new studies.
 - Cache the COMET weight fit. `esp_comet` warns about a large characteristic-object grid *before* pymcdm allocates the judgment matrix; `make_adapter` warns for COMET models built by hand.
 - Breaking: `comet_global_weights(model, bounds)` is replaced by `grid_regression_weights(score_fn, grid_lines, bounds)`; the COMET adapter passes its own scores and grid lines, so no module outside `adapters.py` reads pymcdm internals.
-- Shortened the README to the essentials; references and the code-metadata table moved to the documentation.
 - Include all rank correlations in comparison tables.
 - Breaking: replace the `R2` summary key and comparison row with `r2_fit` and `r2_samples`. `StudyResult.r2` stays as a compatibility alias.
 - Breaking: `ModelAdapter.declared_weights()` returns a `DeclaredWeights` record (weights, source label, optional R²); `CometAdapter.declared_weights_r2()` is removed.

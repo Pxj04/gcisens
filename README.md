@@ -7,79 +7,219 @@
 [![Documentation Status](https://img.shields.io/readthedocs/gcisens?logo=readthedocs&logoColor=white)](https://gcisens.readthedocs.io/en/latest/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?logo=opensourceinitiative&logoColor=white)](https://github.com/Pxj04/gcisens/blob/main/LICENSE)
 
-`gcisens` measures how much each criterion really influences an MCDA model.
-It runs a Sobol' sensitivity analysis, compares the indices with the declared
-or estimated criterion weights, and reports where the two disagree: the
-Sensitivity Discrepancy Report. It supports ESP-COMET, ESP-SPOTIS and any
-Python scoring function.
+`gcisens` is a Python library for analysing how individual criteria influence
+the results of MCDA models. It uses Sobol' sensitivity analysis to compare
+declared criteria weights with their actual impact, helping identify hidden
+nonlinear effects and interactions in ESP-COMET and ESP-SPOTIS models.
 
-| | |
-|---|---|
-| Documentation | https://gcisens.readthedocs.io |
-| PyPI | https://pypi.org/project/gcisens/ |
-| Source articles | [References](https://gcisens.readthedocs.io/en/latest/references.html) |
+**Documentation:** [Read the Docs](https://gcisens.readthedocs.io/en/latest/)
+
+**PyPI:** [gcisens](https://pypi.org/project/gcisens/)
+
+## Features
+
+### Analysis
+
+- **Global sensitivity analysis** — calculates first-order (S1), total-order
+  (ST) and pairwise interaction (S2) Sobol' indices with confidence intervals.
+- **Global and local criterion importance** — estimates the model's overall
+  criterion weights and can examine importance around a selected reference point.
+- **Ranking comparison** — compares rankings produced by criterion weights, S1
+  and ST, including Spearman rank correlations.
+
+### Diagnosis and validation
+
+- **Sensitivity Discrepancy Report** — identifies hidden criterion influence,
+  interaction dominance, moderate discrepancies and agreement between weights
+  and observed sensitivity.
+- **Threshold sweep** — re-classifies the criteria over a grid of threshold
+  values to show how stable the report is.
+- **External validation** — evaluates model scores against known labels using
+  group differences and lift at selected cut-offs.
+- **Configuration comparison** — presents results from multiple model setups
+  side by side.
+
+### Visualisation and reporting
+
+- **Visual analysis** — includes index charts, S2 interaction heatmaps, ranking
+  flows, decision surfaces with ESPs and score distributions.
+- **Reusable outputs** — exports results to CSV, LaTeX and standalone HTML
+  reports.
+
+## Analysis pipeline
+
+The workflow combines `gcisens` code with established implementations from
+[SALib](https://github.com/SALib/SALib),
+[pymcdm](https://github.com/kotbaton/pymcdm) and
+[scikit-learn](https://scikit-learn.org/).
+
+| Step | Function | Implementation |
+|---|---|---|
+| Complete workflow | `SobolStudy.run(reference_point=None)` | Coordinates sampling, model evaluation, weight analysis, ranking and diagnosis in `gcisens` |
+| Sobol' indices | `sobol_analysis(adapter.scores, adapter.bounds, names, ...)` | Wraps SALib's Sobol or Saltelli sampler and Sobol analyser to calculate S1, ST and S2 indices with confidence intervals |
+| Global weights | `grid_regression_weights(score_fn, grid_lines, bounds)` | Fits scikit-learn's `LinearRegression` to the scores over the COMET characteristic-object grid; the COMET adapter passes its own scores and grid lines |
+| Local weights | `adapter.local_weights(point, ...)` | One `gcisens` range-sweep implementation for every model; on COMET it gives the values of pymcdm's `get_local_weights` |
+| Discrepancy diagnosis | `classify(criteria_names, weights, S1, ST, ...)` | Applies the `gcisens` classification rules configured through `DiagnosisThresholds` |
+
+## Supported models
+
+The `COMET`, `SPOTIS` and `ESPExpert` implementations are provided by pymcdm
+and re-exported by `gcisens` for a consistent interface.
+
+| Model | Weight handling | Score orientation | Notes |
+|---|---|---|---|
+| `esp_comet(esps, bounds)` or any `COMET` | estimated by regression | higher = closer to the ESP | supports one or multiple ESPs; pymcdm memory use grows with the square of the characteristic-object count, so `esp_comet` warns before it builds a large grid |
+| `esp_spotis(esp, bounds, weights)` or any `SPOTIS` | supplied with the model | lower = closer to the ESP | uses distance scores |
+| any callable `f(X) -> scores` | optional | higher = better | enables sensitivity analysis of custom scoring models |
 
 ## Installation
+
+You can install `gcisens` from PyPI using pip:
 
 ```bash
 pip install gcisens
 ```
 
-Requires Python 3.11+, NumPy 2.3+ and pymcdm 1.4+. NumPy 2.3 reproduces the
-published multi-ESP results exactly.
+`gcisens` requires Python 3.11 or newer, NumPy 2.3 or newer and pymcdm 1.4 or
+newer. NumPy 2.3 reproduces the published multi-ESP article results, which
+depend on exact floating-point tie detection in pymcdm 1.4.
 
 ## Quick start
 
+The example below builds an ESP-COMET model with three criteria and one expected
+solution point, runs a Sobol' sensitivity analysis and shows how to inspect and
+export the results:
+
 ```python
 import numpy as np
-
-from gcisens import SobolStudy, esp_comet
+from gcisens import esp_comet, SobolStudy
 
 bounds = np.array([[18, 60], [1, 29], [1009, 19999]], float)
-model = esp_comet(
-    esps=[[25, 25, 2000]],  # expected solution point(s)
-    bounds=bounds,
-    criteria_names=["Age", "Distance", "Income"],
-)
+esps = np.array([[25, 25, 2000]])          # expected solution point(s)
+
+model = esp_comet(esps=esps, bounds=bounds,
+                  criteria_names=["Age", "Distance", "Income"])
 
 result = SobolStudy(model, n_samples=2048, seed=42).run()
-result.table()  # weights, S1, ST, ranks and category per criterion
-result.diagnosis()  # Sensitivity Discrepancy Report
-result.to_latex()  # article-ready table
+
+result.table()        # weights, S1, ST, ranks, category per criterion
+result.diagnosis()    # Sensitivity Discrepancy Report
+result.summary()      # r2_fit, r2_samples, ΣS1, ΣST, Spearman correlations
+result.plot_indices() # w vs S1 vs ST bar chart
+result.to_latex()     # publication-ready table
 ```
 
-## What you get
+Alternatively, the model can be constructed directly with the re-exported
+[pymcdm](https://github.com/kotbaton/pymcdm) classes and passed to `SobolStudy`:
+
+```python
+from gcisens import COMET, ESPExpert, SobolStudy
+
+expert = ESPExpert(esps=esps, bounds=bounds)
+model = COMET(expert.make_cvalues_psi(), expert)
+result = SobolStudy(model, bounds=bounds).run()
+```
+
+### What you get
 
 | Call | Output |
 |---|---|
-| `result.table()` | weights, S1, ST, ST − S1, confidence half-widths, ranks, category |
-| `result.diagnosis()` | category and rationale per criterion: hidden influence, interaction dominance, moderate discrepancy, confirmed transparency |
-| `result.summary()` | R² of the linear fits, ΣS1, ΣST, Spearman correlations between weights and indices |
+| `result.table()` | weights, S1, ST, ST − S1, confidence half-widths, ranks and category per criterion |
+| `result.diagnosis()` | Sensitivity Discrepancy Report: category and rationale per criterion |
+| `result.summary()` | `r2_fit`, `r2_samples`, ΣS1, ΣST, Spearman correlations and the run configuration |
 | `result.s2_table()` | pairwise interaction indices with significance |
-| `result.validate(X, labels)` | group differences and lift of the scores against known labels |
-| `result.plot_indices()`, `plot_s2_heatmap()`, `plot_rankings()`, `plot_surface()`, `plot_validation()` | Matplotlib figures in the pymcdm style |
-| `result.to_csv(dir)`, `to_latex()`, `to_html(path)` | CSV bundle, LaTeX tables, standalone HTML report |
-| `compare({"ESP1": r1, "ESP2": r2})` | configurations side by side |
-
-## Supported models
-
-| Model | Declared weights | Score orientation |
-|---|---|---|
-| `esp_comet(esps, bounds)` or any pymcdm `COMET` | estimated by regression on the characteristic objects | higher = closer to the ESP |
-| `esp_spotis(esp, bounds, weights)` or any pymcdm `SPOTIS` | given with the model | lower = closer to the ESP |
-| any callable `f(X) -> scores` | optional | higher = better |
-
-`COMET`, `SPOTIS` and `ESPExpert` are re-exported from pymcdm, so a model
-built the pymcdm way works too: `SobolStudy(COMET(cvalues, expert), bounds=bounds)`.
+| `result.sweep_thresholds(interaction_ratio=[0.2, 0.3, 0.4])` | categories over a grid of threshold values |
+| `result.validate(X, labels)` | group differences and lift@k of the scores against known labels |
+| `result.plot_indices()`, `plot_s2_heatmap()`, `plot_rankings()`, `plot_surface()`, `plot_validation()` | Matplotlib figures |
+| `result.to_csv(dir)`, `to_latex()`, `s2_to_latex()`, `to_html(path)` | CSV bundle, LaTeX tables, standalone HTML report |
+| `compare({"ESP1": r1, "ESP2": r2})` | configurations side by side, with `.table()`, `.to_latex()` and `.to_csv()` |
 
 ## Examples
 
-Both scripts use the bundled IBM HR Attrition sample
-([origin and licence](https://github.com/Pxj04/gcisens/blob/main/examples/data/README.md)).
+The repository includes ready-to-run examples based on the bundled IBM HR
+Attrition dataset (a fictional IBM Watson Analytics sample, ODbL; see
+[`examples/data/README.md`](https://github.com/Pxj04/gcisens/blob/main/examples/data/README.md)):
 
-- [`examples/article_esp_comet.py`](https://github.com/Pxj04/gcisens/blob/main/examples/article_esp_comet.py) reproduces the ESP-COMET tables of the source article and writes CSV, LaTeX and HTML.
-- [`examples/esp_spotis_demo.py`](https://github.com/Pxj04/gcisens/blob/main/examples/esp_spotis_demo.py) compares ESP-SPOTIS with ESP-COMET at the same ESP.
+- [`article_esp_comet.py`](https://github.com/Pxj04/gcisens/blob/main/examples/article_esp_comet.py) - analyses multiple
+  ESP-COMET configurations and generates CSV, LaTeX and HTML reports.
+- [`esp_spotis_demo.py`](https://github.com/Pxj04/gcisens/blob/main/examples/esp_spotis_demo.py) - compares ESP-SPOTIS
+  with ESP-COMET using the same expected solution point.
+
+The [methodology page](https://gcisens.readthedocs.io/en/latest/methodology.html)
+lists the assumptions behind the indices and shows how the report reacts to
+its thresholds. The [troubleshooting page](https://gcisens.readthedocs.io/en/latest/troubleshooting.html)
+lists the warnings and errors with their causes and fixes.
+
+## Code metadata
+
+| Nr | Code metadata description | Value |
+|---|---|---|
+| C1 | Current code version | 0.1.3 |
+| C2 | Permanent link to code/repository | https://github.com/Pxj04/gcisens |
+| C3 | Permanent link to reproducible capsule | Not yet archived. Each release tag gets a Zenodo DOI (see [CONTRIBUTING.md](https://github.com/Pxj04/gcisens/blob/main/CONTRIBUTING.md)) |
+| C4 | Legal code licence | MIT |
+| C5 | Code versioning system used | git |
+| C6 | Software code languages, tools and services used | Python |
+| C7 | Compilation requirements, operating environments and dependencies | Python >= 3.11; NumPy >= 2.3, pandas, SciPy, scikit-learn, SALib, pymcdm >= 1.4, Matplotlib |
+| C8 | Link to developer documentation/manual | https://gcisens.readthedocs.io |
+| C9 | Support email for questions | szymon-sniegowski@zut.edu.pl, adrianna-swider@zut.edu.pl ([GitHub issues](https://github.com/Pxj04/gcisens/issues) for bug reports) |
+
+<!-- about-end -->
+
+## References
+
+The first two entries are the source articles of the workflow.
+
+- Śniegowski, S., Świder, A., Shekhovtsov, A., & Sałabun, W. (2026).
+  Detecting Hidden Criterion Influence When Weights Mislead in Rule-Based
+  Decision Support Systems. *30th International Conference on Knowledge-Based
+  and Intelligent Information & Engineering Systems (KES 2026)*, to appear.
+- Sałabun, W., Shekhovtsov, A., & Wątróbski, J. (2025). [Variance-Based
+  Analysis of Global Criteria Importance in the ESP-COMET
+  Method](https://doi.org/10.62036/ISD.2025.83). In I. Luković et al. (Eds.),
+  *Empowering the Interdisciplinary Role of ISD in Addressing Contemporary
+  Issues in Digital Transformation (ISD 2025 Proceedings)*. University of
+  Gdańsk & University of Belgrade. ISBN 978-83-972632-1-5.
+- Więckowski, J., Kizielewicz, B., Shekhovtsov, A., & Sałabun, W. (2023).
+  [How do the criteria affect sustainable supplier evaluation? A case study
+  using multi-criteria decision analysis methods in a fuzzy environment
+  (local and global importance weights)](https://doi.org/10.1142/S0219622022500948).
+  *International Journal of Information Technology & Decision Making, 22*(6).
+- Shekhovtsov, A., & Sałabun, W. (2024). [Comparing Global and Local Weights
+  in Multi-Criteria Decision-Making: A COMET-Based
+  Approach](https://doi.org/10.5220/0012360700003636). *Proceedings of the
+  16th International Conference on Agents and Artificial Intelligence
+  (ICAART 2024)*.
+
+- Sobol', I. M. (2001). [Global sensitivity indices for nonlinear mathematical
+  models and their Monte Carlo estimates](https://doi.org/10.1016/S0378-4754(00)00270-6).
+  *Mathematics and Computers in Simulation, 55*(1-3), 271-280.
+- Saltelli, A., Annoni, P., Azzini, I., Campolongo, F., Ratto, M., & Tarantola,
+  S. (2010). [Variance based sensitivity analysis of model output: Design and
+  estimator for the total sensitivity index](https://doi.org/10.1016/j.cpc.2009.09.018).
+  *Computer Physics Communications, 181*(2), 259-270.
+- Herman, J., & Usher, W. (2017). [SALib: An open-source Python library for
+  sensitivity analysis](https://doi.org/10.21105/joss.00097).
+  *Journal of Open Source Software, 2*(9), 97.
+- Kizielewicz, B., Shekhovtsov, A., & Sałabun, W. (2023). [pymcdm - The
+  universal library for solving multi-criteria decision-making
+  problems](https://doi.org/10.1016/j.softx.2023.101368).
+  *SoftwareX, 22*, 101368.
+- Sałabun, W. (2015). [The Characteristic Objects Method: A new distance-based
+  approach to multicriteria decision-making problems](https://doi.org/10.1002/mcda.1525).
+  *Journal of Multi-Criteria Decision Analysis, 22*(1-2), 37-50.
+- Shekhovtsov, A., Kizielewicz, B., & Sałabun, W. (2023). [Advancing individual
+  decision-making: An extension of the Characteristic Objects Method using
+  Expected Solution Point](https://doi.org/10.1016/j.ins.2023.119456).
+  *Information Sciences, 647*, 119456.
+- Dezert, J., Tchamova, A., Han, D., & Tacnet, J.-M. (2020). [The SPOTIS rank
+  reversal free method for multi-criteria decision-making support](https://doi.org/10.23919/FUSION45008.2020.9190347).
+  *2020 IEEE 23rd International Conference on Information Fusion (FUSION)*, 1-8.
+- [IBM HR Analytics Employee Attrition & Performance](https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset) -
+  IBM Watson Analytics sample dataset used in the examples.
 
 ## License
 
-MIT. See [LICENSE](https://github.com/Pxj04/gcisens/blob/main/LICENSE).
+`gcisens` is available under the MIT License. You may use, modify and
+distribute it under its terms. See the
+[LICENSE](https://github.com/Pxj04/gcisens/blob/main/LICENSE) file for details.
