@@ -188,6 +188,30 @@ See [CONTRIBUTING.md](https://github.com/Pxj04/gcisens/blob/main/CONTRIBUTING.md
 for the repository map, development checks and release checklist. It explains
 which files to update for code changes, documentation changes and new releases.
 
+## Citing gcisens
+
+If `gcisens` contributes to a scientific publication, please cite the archived
+software release:
+
+> Świder, A., & Śniegowski, S. (2026). *gcisens* (Version 0.1.3) [Computer
+> software]. Zenodo. https://doi.org/10.5281/zenodo.22384207
+
+Or use BibTeX:
+
+```bibtex
+@software{swider_gcisens_2026,
+  author    = {Adrianna Świder and Szymon Śniegowski},
+  title     = {gcisens},
+  year      = {2026},
+  publisher = {Zenodo},
+  version   = {0.1.3},
+  doi       = {10.5281/zenodo.22384207},
+  url       = {https://doi.org/10.5281/zenodo.22384207}
+}
+```
+
+DOI: [10.5281/zenodo.22384207](https://doi.org/10.5281/zenodo.22384207)
+
 <!-- about-end -->
 
 ## References
